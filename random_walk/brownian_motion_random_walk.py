@@ -1,4 +1,3 @@
-import networkx as nx
 import numpy as np
 
 from random_walk.base_random_walk import BaseRandomWalk
