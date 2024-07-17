@@ -1,5 +1,6 @@
 import networkx as nx
 from codex.codex import Codex
+import torch
 from torch.utils.data import DataLoader
 from random_walk.brownian_motion_random_walk import BrownianMotionRandomWalk
 from random_walk.ergrw_random_walk import ERGRWRandomWalk
@@ -20,6 +21,9 @@ def get_random_walk_strategy(name, graph):
 
 
 def main(random_walk_name):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Device:", device)
+
     # Initialize Codex
     codex = Codex(code="en", size="s")
 
@@ -97,6 +101,7 @@ if __name__ == "__main__":
     main(args.random_walk)
 
     # Running script:
-    # python main.py --random_walk BrownianMotion
-    # python main.py --random_walk ERGRW
-    # python main.py --random_walk Node2Vec
+    # python random_walk_classifier/random_walk_classifier.py --random_walk <name_of_random_walk_strategy>
+    # python random_walk_classifier/random_walk_classifier.py --random_walk BrownianMotion
+    # python random_walk_classifier/random_walk_classifier.py --random_walk ERGRW
+    # python random_walk_classifier/random_walk_classifier.py --random_walk Node2Vec

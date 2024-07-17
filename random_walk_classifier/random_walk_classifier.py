@@ -3,7 +3,9 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 import networkx as nx
-from random_walk import BaseRandomWalk
+
+from random_walk.base_random_walk import BaseRandomWalk
+
 
 class RandomWalkClassifier:
     def __init__(self, graph: nx.Graph, random_walk: BaseRandomWalk):
