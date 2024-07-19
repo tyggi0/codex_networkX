@@ -3,12 +3,10 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 import networkx as nx
-import logging
+import sys
 
 from brownian_motion_random_walk import BrownianMotionRandomWalk
 from ergrw_random_walk import ERGRWRandomWalk
-
-logger = logging.getLogger(__name__)
 
 
 class RandomWalkClassifier:
@@ -90,7 +88,7 @@ class RandomWalkClassifier:
                 loss = outputs.loss
                 loss.backward()
                 self.optimizer.step()
-                logger.info(f'Epoch {epoch}, Loss: {loss.item()}')
+                sys.stdout.write(f'Epoch {epoch}, Loss: {loss.item()}\n')
 
     def evaluate(self, dataloader):
         self.model.eval()
@@ -103,4 +101,4 @@ class RandomWalkClassifier:
                 _, predicted = torch.max(outputs.logits, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
-        logger.info(f'Accuracy: {correct / total * 100}%')
+        sys.stdout.write(f'Accuracy: {correct / total * 100}%\n')
