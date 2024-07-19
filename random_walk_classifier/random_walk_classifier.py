@@ -8,7 +8,6 @@ import sys
 from brownian_motion_random_walk import BrownianMotionRandomWalk
 from ergrw_random_walk import ERGRWRandomWalk
 
-
 class RandomWalkClassifier:
     def __init__(self, graph: nx.Graph, random_walk_strategy, device):
         self.graph = graph
@@ -49,6 +48,7 @@ class RandomWalkClassifier:
         return invalid_walks
 
     def encode_walks(self, walks):
+        # Ensure all elements in the walks are converted to strings
         return [self.tokenizer.encode(' '.join(map(str, walk)), add_special_tokens=True) for walk in walks]
 
     def prepare_data(self, valid_walks, invalid_walks):
@@ -61,34 +61,47 @@ class RandomWalkClassifier:
         walks = encoded_valid_walks + encoded_invalid_walks
         labels = labels_valid + labels_invalid
 
-        data = list(zip(walks, labels))
-        random.shuffle(data)
-        walks, labels = zip(*data)
-
         return walks, labels
 
     class WalkDataset(Dataset):
-        def __init__(self, walks, labels):
+        def __init__(self, walks, labels, tokenizer):
             self.walks = walks
             self.labels = labels
+            self.tokenizer = tokenizer
 
         def __len__(self):
             return len(self.walks)
 
         def __getitem__(self, idx):
-            return torch.tensor(self.walks[idx]), torch.tensor(self.labels[idx])
+            walk = self.walks[idx]
+            label = self.labels[idx]
+            # Convert walk to string before tokenization
+            walk_str = ' '.join(map(str, walk))
+            encoding = self.tokenizer(walk_str, return_tensors='pt', padding='max_length', truncation=True, max_length=512)
+            return (encoding['input_ids'].squeeze(), encoding['attention_mask'].squeeze(),
+                    torch.tensor(label, dtype=torch.long))
+
+        @staticmethod
+        def collate_fn(batch):
+            input_ids = torch.stack([item[0] for item in batch])
+            attention_masks = torch.stack([item[1] for item in batch])
+            labels = torch.stack([item[2] for item in batch])
+            return input_ids, attention_masks, labels
+
+        def get_dataloader(self, batch_size=8, shuffle=False):
+            return DataLoader(self, batch_size=batch_size, shuffle=shuffle, collate_fn=self.collate_fn)
 
     def train(self, dataloader, epochs=3):
         self.model.train()
         for epoch in range(epochs):
             for batch in dataloader:
-                inputs, labels = [item.to(self.device) for item in batch]
+                inputs, attention_masks, labels = [item.to(self.device) for item in batch]
                 self.optimizer.zero_grad()
-                outputs = self.model(inputs, labels=labels)
+                outputs = self.model(input_ids=inputs, attention_mask=attention_masks, labels=labels)
                 loss = outputs.loss
                 loss.backward()
                 self.optimizer.step()
-                sys.stdout.write(f'Epoch {epoch}, Loss: {loss.item()}\n')
+                sys.stdout.write(f'Epoch {epoch + 1}, Loss: {loss.item()}\n')
 
     def evaluate(self, dataloader):
         self.model.eval()
@@ -96,9 +109,9 @@ class RandomWalkClassifier:
         total = 0
         with torch.no_grad():
             for batch in dataloader:
-                inputs, labels = [item.to(self.device) for item in batch]
-                outputs = self.model(inputs)
+                inputs, attention_masks, labels = [item.to(self.device) for item in batch]
+                outputs = self.model(input_ids=inputs, attention_mask=attention_masks)
                 _, predicted = torch.max(outputs.logits, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
-        sys.stdout.write(f'Accuracy: {correct / total * 100}%\n')
+        sys.stdout.write(f'Accuracy: {correct / total * 100:.2f}%\n')

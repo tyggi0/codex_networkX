@@ -2,9 +2,10 @@ import networkx as nx
 from codex.codex import Codex
 import torch
 from torch.utils.data import DataLoader
-from random_walk_classifier.random_walk_classifier import RandomWalkClassifier
+from random_walk_classifier import RandomWalkClassifier
 import argparse
 import sys
+
 
 def construct_labeled_graph(triples, codex):
     G = nx.Graph()
@@ -50,15 +51,16 @@ def main(random_walk_name):
     sys.stdout.write("Generating train walks...\n")
     train_valid_walks = classifier.generate_random_walks(num_walks=500, walk_length=5)
     train_invalid_walks = classifier.generate_invalid_random_walks(num_walks=500, walk_length=5)
-    sys.stdout.write(f"Generated {len(train_valid_walks)} valid train walks and {len(train_invalid_walks)} invalid train walks.\n")
+    sys.stdout.write(
+        f"Generated {len(train_valid_walks)} valid train walks and {len(train_invalid_walks)} invalid train walks.\n")
     sys.stdout.write(f"Valid train walks: {train_valid_walks}\n")
     sys.stdout.write(f"Invalid train walks: {train_invalid_walks}\n")
 
     train_walks, train_labels = classifier.prepare_data(train_valid_walks, train_invalid_walks)
     sys.stdout.write(f"Sample encoded train walk: {train_walks[0]}, Label: {train_labels[0]}\n")
 
-    train_dataset = RandomWalkClassifier.WalkDataset(train_walks, train_labels)
-    train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+    train_dataset = RandomWalkClassifier.WalkDataset(train_walks, train_labels, classifier.tokenizer)
+    train_dataloader = train_dataset.get_dataloader(batch_size=8, shuffle=True)
 
     # Train the model
     sys.stdout.write("Training the model...\n")
@@ -72,15 +74,16 @@ def main(random_walk_name):
     sys.stdout.write("Generating validation walks...\n")
     valid_valid_walks = classifier.generate_random_walks(num_walks=100, walk_length=5)
     valid_invalid_walks = classifier.generate_invalid_random_walks(num_walks=100, walk_length=5)
-    sys.stdout.write(f"Generated {len(valid_valid_walks)} valid validation walks and {len(valid_invalid_walks)} invalid validation walks.\n")
+    sys.stdout.write(
+        f"Generated {len(valid_valid_walks)} valid validation walks and {len(valid_invalid_walks)} invalid validation walks.\n")
     sys.stdout.write(f"Valid validation walks: {valid_valid_walks}\n")
     sys.stdout.write(f"Invalid validation walks: {valid_invalid_walks}\n")
 
     valid_walks, valid_labels = classifier.prepare_data(valid_valid_walks, valid_invalid_walks)
     sys.stdout.write(f"Sample encoded validation walk: {valid_walks[0]}, Label: {valid_labels[0]}\n")
 
-    valid_dataset = RandomWalkClassifier.WalkDataset(valid_walks, valid_labels)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=8, shuffle=False)
+    valid_dataset = RandomWalkClassifier.WalkDataset(valid_walks, valid_labels, classifier.tokenizer)
+    valid_dataloader = valid_dataset.get_dataloader(batch_size=8)
 
     # Evaluate the model on validation data
     sys.stdout.write("Evaluating the model on validation data...\n")
@@ -94,15 +97,16 @@ def main(random_walk_name):
     sys.stdout.write("Generating test walks...\n")
     test_valid_walks = classifier.generate_random_walks(num_walks=100, walk_length=5)
     test_invalid_walks = classifier.generate_invalid_random_walks(num_walks=100, walk_length=5)
-    sys.stdout.write(f"Generated {len(test_valid_walks)} valid test walks and {len(test_invalid_walks)} invalid test walks.\n")
+    sys.stdout.write(
+        f"Generated {len(test_valid_walks)} valid test walks and {len(test_invalid_walks)} invalid test walks.\n")
     sys.stdout.write(f"Valid test walks: {test_valid_walks}\n")
     sys.stdout.write(f"Invalid test walks: {test_invalid_walks}\n")
 
     test_walks, test_labels = classifier.prepare_data(test_valid_walks, test_invalid_walks)
     sys.stdout.write(f"Sample encoded test walk: {test_walks[0]}, Label: {test_labels[0]}\n")
 
-    test_dataset = RandomWalkClassifier.WalkDataset(test_walks, test_labels)
-    test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
+    test_dataset = RandomWalkClassifier.WalkDataset(test_walks, test_labels, classifier.tokenizer)
+    test_dataloader = test_dataset.get_dataloader(batch_size=8)
 
     # Evaluate the model on test data
     sys.stdout.write("Evaluating the model on test data...\n")
