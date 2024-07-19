@@ -7,22 +7,25 @@ from random_walk.ergrw_random_walk import ERGRWRandomWalk
 from random_walk.node2_vec_random_walk import Node2VecRandomWalk
 from random_walk_classifier.random_walk_classifier import RandomWalkClassifier
 import argparse
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def get_random_walk_strategy(name, graph):
-    if name == "BrownianMotion":
-        return BrownianMotionRandomWalk(graph)
-    elif name == "ERGRW":
-        return ERGRWRandomWalk(graph)
-    elif name == "Node2Vec":
-        return Node2VecRandomWalk(graph)
-    else:
-        raise ValueError(f"Unknown random walk strategy: {name}")
+def construct_labeled_graph(triples, codex):
+    G = nx.Graph()
+    for head, relation, tail in triples.values:
+        head_label = codex.entity_label(head)
+        relation_label = codex.relation_label(relation)
+        tail_label = codex.entity_label(tail)
+        G.add_edge(head_label, tail_label, relation=relation_label)
+    return G
 
 
 def main(random_walk_name):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Device:", device)
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
@@ -32,71 +35,67 @@ def main(random_walk_name):
     relations = codex.relations()
     triples = codex.triples()
 
-    print("Number of entities:", len(entities))
-    print("Number of relations:", len(relations))
-    print("Number of triples:", len(triples))
+    logger.info("Number of entities: %d", len(entities))
+    logger.info("Number of relations: %d", len(relations))
+    logger.info("Number of triples: %d", len(triples))
 
     # Access train, validation, and test triples
     train_triples = codex.split("train")
     valid_triples = codex.split("valid")
     test_triples = codex.split("test")
 
-    # Construct graphs
-    def construct_graph(triples):
-        G = nx.Graph()
-
-        # Add entities as nodes
-        for entity in entities:
-            G.add_node(entity)
-
-        # Add triples as edges
-        for head, relation, tail in triples:
-            G.add_edge(head, tail, relation=relation)
-        return G
-
-    train_graph = construct_graph(train_triples)
-    valid_graph = construct_graph(valid_triples)
-    test_graph = construct_graph(test_triples)
+    # Construct graphs with labeled triples
+    train_graph = construct_labeled_graph(train_triples, codex)
+    valid_graph = construct_labeled_graph(valid_triples, codex)
+    test_graph = construct_labeled_graph(test_triples, codex)
 
     # Initialize classifier with the specified random walk strategy
-    random_walk_strategy = get_random_walk_strategy(random_walk_name, train_graph)
-    classifier = RandomWalkClassifier(train_graph, random_walk_strategy)
+    classifier = RandomWalkClassifier(train_graph, random_walk_name, device=device)
 
-    # Generate walks
-    valid_walks = classifier.generate_random_walks(num_walks=50, walk_length=5)
-    invalid_walks = classifier.generate_invalid_random_walks(num_walks=50, walk_length=5)
-    print("Valid Walks:")
-    [print(walk) for walk in valid_walks]
+    # Generate train walks
+    train_valid_walks = classifier.generate_random_walks(num_walks=500, walk_length=5)
+    train_invalid_walks = classifier.generate_invalid_random_walks(num_walks=500, walk_length=5)
 
-    print("Invalid Walks:")
-    [print(walk) for walk in invalid_walks]
-
-    walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
-    dataset = RandomWalkClassifier.WalkDataset(walks, labels)
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
+    train_walks, train_labels = classifier.prepare_data(train_valid_walks, train_invalid_walks)
+    train_dataset = RandomWalkClassifier.WalkDataset(train_walks, train_labels)
+    train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 
     # Train the model
-    classifier.train(dataloader)
+    classifier.train(train_dataloader)
 
-    # Generate test data
-    random_walk_strategy = get_random_walk_strategy(random_walk_name, test_graph)
-    classifier = RandomWalkClassifier(test_graph, random_walk_strategy)
+    # Initialize classifier for validation with the specified random walk strategy
+    classifier = RandomWalkClassifier(valid_graph, random_walk_name, device=device)
 
-    test_valid_walks = classifier.generate_random_walks(num_walks=20, walk_length=5)
-    test_invalid_walks = classifier.generate_invalid_random_walks(num_walks=20, walk_length=5)
+    # Generate validation walks
+    valid_valid_walks = classifier.generate_random_walks(num_walks=100, walk_length=5)
+    valid_invalid_walks = classifier.generate_invalid_random_walks(num_walks=100, walk_length=5)
+
+    valid_walks, valid_labels = classifier.prepare_data(valid_valid_walks, valid_invalid_walks)
+    valid_dataset = RandomWalkClassifier.WalkDataset(valid_walks, valid_labels)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=8, shuffle=False)
+
+    # Evaluate the model on validation data
+    classifier.evaluate(valid_dataloader)
+
+    # Initialize classifier for testing with the specified random walk strategy
+    classifier = RandomWalkClassifier(test_graph, random_walk_name, device=device)
+
+    # Generate test walks
+    test_valid_walks = classifier.generate_random_walks(num_walks=100, walk_length=5)
+    test_invalid_walks = classifier.generate_invalid_random_walks(num_walks=100, walk_length=5)
 
     test_walks, test_labels = classifier.prepare_data(test_valid_walks, test_invalid_walks)
     test_dataset = RandomWalkClassifier.WalkDataset(test_walks, test_labels)
     test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 
-    # Evaluate the model
+    # Evaluate the model on test data
     classifier.evaluate(test_dataloader)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Random Walk Classifier')
     parser.add_argument('--random_walk', type=str, required=True,
-                        help='Name of the random walk strategy (BrownianMotion, ERGRW, Node2Vec)')
+                        help='Name of the random walk strategy (BrownianMotion, ERGRW)')
     args = parser.parse_args()
     main(args.random_walk)
 

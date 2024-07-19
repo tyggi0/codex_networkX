@@ -4,19 +4,29 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 import networkx as nx
 
-from random_walk.base_random_walk import BaseRandomWalk
+from random_walk.brownian_motion_random_walk import BrownianMotionRandomWalk
+from random_walk.ergrw_random_walk import ERGRWRandomWalk
 
 
 class RandomWalkClassifier:
-    def __init__(self, graph: nx.Graph, random_walk: BaseRandomWalk):
+    def __init__(self, graph: nx.Graph, random_walk_strategy, device):
         self.graph = graph
-        self.random_walk = random_walk
+        self.random_walk = self.get_random_walk_strategy(random_walk_strategy)
+        self.device = device
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2)
         self.optimizer = AdamW(self.model.parameters(), lr=1e-5)
 
+    def get_random_walk_strategy(self, name):
+        if name == "BrownianMotion":
+            self.random_walk = BrownianMotionRandomWalk(self, )
+        elif name == "ERGRW":
+            self.random_walk = ERGRWRandomWalk(self)
+        else:
+            raise ValueError(f"Unknown random walk strategy: {name}")
+
     def generate_random_walks(self, num_walks, walk_length):
-        return [self.random_walk.walk(random.choice(list(self.graph.nodes)), walk_length) for _ in range(num_walks)]
+        return self.random_walk.generate_walks(num_walks, walk_length)
 
     def generate_invalid_random_walks(self, num_walks, walk_length):
         nodes = list(self.graph.nodes)

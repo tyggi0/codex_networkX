@@ -1,11 +1,10 @@
+import networkx as nx
 import numpy as np
 
-from random_walk.base_random_walk import BaseRandomWalk
 
-
-class BrownianMotionRandomWalk(BaseRandomWalk):
-    def __init__(self):
-        super().__init__()
+class BrownianMotionRandomWalk:
+    def __init__(self, G: nx.Graph):
+        self.G = G
 
     def walk(self, start_node, steps):
         path = [start_node]
@@ -21,12 +20,12 @@ class BrownianMotionRandomWalk(BaseRandomWalk):
 
         return path
 
-    def generate_walks(self):
+    def generate_walks(self, num_walks, walk_length):
         walks = []
         nodes = list(self.G.nodes)
 
-        for _ in range(self.num_walks):
+        for _ in range(num_walks):
             start_node = np.random.choice(nodes)
-            walks.append(self.walk(start_node, self.walk_length))
+            walks.append(self.walk(start_node, walk_length))
 
         return walks
