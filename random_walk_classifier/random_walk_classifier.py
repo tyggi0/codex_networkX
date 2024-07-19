@@ -5,8 +5,8 @@ from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 import networkx as nx
 import logging
 
-from random_walk.brownian_motion_random_walk import BrownianMotionRandomWalk
-from random_walk.ergrw_random_walk import ERGRWRandomWalk
+from brownian_motion_random_walk import BrownianMotionRandomWalk
+from ergrw_random_walk import ERGRWRandomWalk
 
 logger = logging.getLogger(__name__)
 
