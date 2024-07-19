@@ -3,9 +3,12 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 import networkx as nx
+import logging
 
 from random_walk.brownian_motion_random_walk import BrownianMotionRandomWalk
 from random_walk.ergrw_random_walk import ERGRWRandomWalk
+
+logger = logging.getLogger(__name__)
 
 
 class RandomWalkClassifier:
@@ -14,14 +17,14 @@ class RandomWalkClassifier:
         self.random_walk = self.get_random_walk_strategy(random_walk_strategy)
         self.device = device
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2)
+        self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
         self.optimizer = AdamW(self.model.parameters(), lr=1e-5)
 
     def get_random_walk_strategy(self, name):
         if name == "BrownianMotion":
-            self.random_walk = BrownianMotionRandomWalk(self, )
+            return BrownianMotionRandomWalk(self.graph)
         elif name == "ERGRW":
-            self.random_walk = ERGRWRandomWalk(self)
+            return ERGRWRandomWalk(self.graph)
         else:
             raise ValueError(f"Unknown random walk strategy: {name}")
 
@@ -81,13 +84,13 @@ class RandomWalkClassifier:
         self.model.train()
         for epoch in range(epochs):
             for batch in dataloader:
-                inputs, labels = batch
+                inputs, labels = [item.to(self.device) for item in batch]
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs, labels=labels)
                 loss = outputs.loss
                 loss.backward()
                 self.optimizer.step()
-                print(f'Epoch {epoch}, Loss: {loss.item()}')
+                logger.info(f'Epoch {epoch}, Loss: {loss.item()}')
 
     def evaluate(self, dataloader):
         self.model.eval()
@@ -95,9 +98,9 @@ class RandomWalkClassifier:
         total = 0
         with torch.no_grad():
             for batch in dataloader:
-                inputs, labels = batch
+                inputs, labels = [item.to(self.device) for item in batch]
                 outputs = self.model(inputs)
                 _, predicted = torch.max(outputs.logits, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
-        print(f'Accuracy: {correct / total * 100}%')
+        logger.info(f'Accuracy: {correct / total * 100}%')
