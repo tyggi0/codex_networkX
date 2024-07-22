@@ -1,8 +1,8 @@
 import random
 import torch
 from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizer, BertForSequenceClassification, AdamW, TrainingArguments, Trainer
-from datasets import Dataset as HFDataset, load_metric
+from transformers import BertTokenizer, BertForSequenceClassification, TrainingArguments, Trainer
+from datasets import Dataset as HFDataset
 import networkx as nx
 import sys
 import ray

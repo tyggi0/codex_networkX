@@ -13,3 +13,4 @@ accelerate>=0.10.0
 torch>=1.8.0
 datasets
 ray[tune]
+evaluate
