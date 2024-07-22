@@ -7,6 +7,16 @@ import argparse
 import sys
 
 
+def construct_labeled_graph(triples, codex):
+    G = nx.Graph()
+    for head, relation, tail in triples.values:
+        head_label = codex.entity_label(head)
+        relation_label = codex.relation_label(relation)
+        tail_label = codex.entity_label(tail)
+        G.add_edge(head_label, tail_label, relation=relation_label)
+    return G
+
+
 def main(random_walk_name, tune=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -118,6 +128,6 @@ if __name__ == "__main__":
     main(args.random_walk, args.tune)
 
     # Running script:
-    # python random_walk_classifier/random_walk_classifier.py --random_walk <name_of_random_walk_strategy> [--tune]
-    # python random_walk_classifier/random_walk_classifier.py --random_walk BrownianMotion --tune
-    # python random_walk_classifier/random_walk_classifier.py --random_walk ERGRW
+    # python -m random_walk_classifier --random_walk <name_of_random_walk_strategy> [--tune]
+    # python -m random_walk_classifier --random_walk BrownianMotion --tune
+    # python -m random_walk_classifier --random_walk ERGRW

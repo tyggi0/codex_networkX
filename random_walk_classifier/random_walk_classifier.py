@@ -31,6 +31,9 @@ class RandomWalkClassifier:
         self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
         self.optimizer = AdamW(self.model.parameters(), lr=self.learning_rate)
 
+    def get_dataloader(self, dataset):
+        return DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+
     def get_random_walk_strategy(self, name):
         if name == "BrownianMotion":
             return BrownianMotionRandomWalk(self.graph)
