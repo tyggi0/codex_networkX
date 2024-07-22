@@ -1,10 +1,15 @@
+import random
 import torch
-import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import BertTokenizer, BertForSequenceClassification, AdamW, TrainingArguments, Trainer
+from datasets import Dataset as HFDataset, load_metric
 import networkx as nx
 import sys
-import random
+import ray
+from ray import tune
+from ray.tune.schedulers import ASHAScheduler
+from ray.tune import CLIReporter
+
 from brownian_motion_random_walk import BrownianMotionRandomWalk
 from ergrw_random_walk import ERGRWRandomWalk
 
@@ -16,7 +21,8 @@ class RandomWalkClassifier:
         self.device = device
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=1e-5)  # Updated optimizer
+        self.optimizer = AdamW(self.model.parameters(), lr=1e-5)
+        self.metric = load_metric('accuracy')
 
     def get_random_walk_strategy(self, name):
         if name == "BrownianMotion":
@@ -49,7 +55,7 @@ class RandomWalkClassifier:
         return invalid_walks
 
     def encode_walks(self, walks):
-        return [self.tokenizer.encode(' '.join(map(str, walk)), add_special_tokens=True) for walk in walks]
+        return [self.tokenizer(' '.join(map(str, walk)), truncation=True, padding='max_length', max_length=512) for walk in walks]
 
     def prepare_data(self, valid_walks, invalid_walks):
         encoded_valid_walks = self.encode_walks(valid_walks)
@@ -61,33 +67,80 @@ class RandomWalkClassifier:
         walks = encoded_valid_walks + encoded_invalid_walks
         labels = labels_valid + labels_invalid
 
-        return walks, labels
+        return HFDataset.from_dict({'walks': walks, 'labels': labels})
 
-    class WalkDataset(Dataset):
-        def __init__(self, walks, labels, tokenizer):
-            self.walks = walks
-            self.labels = labels
-            self.tokenizer = tokenizer
+    def compute_metrics(self, eval_pred):
+        predictions, labels = eval_pred
+        predictions = predictions.argmax(axis=-1)
+        return self.metric.compute(predictions=predictions, references=labels)
 
-        def __len__(self):
-            return len(self.walks)
+    def tune_hyperparameters(self, train_dataset, valid_dataset, num_samples=10, max_num_epochs=10, gpus_per_trial=1):
+        def model_init():
+            return BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2)
 
-        def __getitem__(self, idx):
-            walk = self.walks[idx]
-            label = self.labels[idx]
-            encoding = self.tokenizer(walk, return_tensors='pt', padding='max_length', truncation=True, max_length=512)
-            return (encoding['input_ids'].squeeze(), encoding['attention_mask'].squeeze(),
-                    torch.tensor(label, dtype=torch.long))
+        def encode(examples):
+            outputs = self.tokenizer(
+                examples['walks'], truncation=True, padding='max_length', max_length=512
+            )
+            return outputs
 
-        @staticmethod
-        def collate_fn(batch):
-            input_ids = torch.stack([item[0] for item in batch])
-            attention_masks = torch.stack([item[1] for item in batch])
-            labels = torch.stack([item[2] for item in batch])
-            return input_ids, attention_masks, labels
+        encoded_train_dataset = train_dataset.map(encode, batched=True)
+        encoded_valid_dataset = valid_dataset.map(encode, batched=True)
 
-        def get_dataloader(self, batch_size=8, shuffle=False):
-            return DataLoader(self, batch_size=batch_size, shuffle=shuffle, collate_fn=self.collate_fn)
+        training_args = TrainingArguments(
+            "test",
+            evaluation_strategy="steps",
+            eval_steps=500,
+            disable_tqdm=True,
+            num_train_epochs=max_num_epochs,
+        )
+
+        trainer = Trainer(
+            args=training_args,
+            train_dataset=encoded_train_dataset,
+            eval_dataset=encoded_valid_dataset,
+            tokenizer=self.tokenizer,
+            model_init=model_init,
+            compute_metrics=self.compute_metrics,
+        )
+
+        search_space = {
+            "learning_rate": tune.loguniform(1e-6, 1e-4),
+            "batch_size": tune.choice([8, 16, 32]),
+            "epochs": tune.randint(1, 5)
+        }
+
+        scheduler = ASHAScheduler(
+            metric="accuracy",
+            mode="max",
+            max_t=10,
+            grace_period=1,
+            reduction_factor=2
+        )
+
+        reporter = CLIReporter(
+            metric_columns=["accuracy", "training_iteration"]
+        )
+
+        ray.init()
+        analysis = trainer.hyperparameter_search(
+            direction="maximize",
+            backend="ray",
+            n_trials=num_samples,
+            search_alg=search_space,
+            scheduler=scheduler,
+            keep_checkpoints_num=1,
+            checkpoint_score_attr="training_iteration",
+            resources_per_trial={"cpu": 1, "gpu": gpus_per_trial},
+            progress_reporter=reporter,
+            local_dir="./ray_results",
+            name="tune_transformer"
+        )
+        ray.shutdown()
+
+        best_trial = analysis.get_best_trial("accuracy", "max", "last")
+        print(f"Best trial config: {best_trial.config}")
+        print(f"Best trial final validation accuracy: {analysis.last_result['accuracy']}")
 
     def train(self, dataloader, epochs=3):
         self.model.train()
