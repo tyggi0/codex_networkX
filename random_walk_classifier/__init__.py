@@ -7,16 +7,6 @@ import argparse
 import sys
 
 
-def construct_labeled_graph(triples, codex):
-    G = nx.Graph()
-    for head, relation, tail in triples.values:
-        head_label = codex.entity_label(head)
-        relation_label = codex.relation_label(relation)
-        tail_label = codex.entity_label(tail)
-        G.add_edge(head_label, tail_label, relation=relation_label)
-    return G
-
-
 def main(random_walk_name, tune=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -64,8 +54,21 @@ def main(random_walk_name, tune=False):
 
     if tune:
         sys.stdout.write("Tuning hyperparameters...\n")
-        classifier.tune_hyperparameters(train_dataset, valid_dataset)
+        best_config = classifier.tune_hyperparameters(train_dataset, valid_dataset)
         sys.stdout.write("Hyperparameter tuning completed.\n")
+
+        # Set best hyperparameters and re-initialize the model and optimizer
+        classifier.set_hyperparameters(
+            learning_rate=best_config["learning_rate"],
+            batch_size=best_config["batch_size"],
+            epochs=best_config["epochs"]
+        )
+
+        # Train the model with the best hyperparameters
+        train_dataloader = classifier.get_dataloader(train_dataset)
+        sys.stdout.write("Training the model with best hyperparameters...\n")
+        classifier.train(train_dataloader, epochs=best_config['epochs'])
+        sys.stdout.write("Training completed.\n")
     else:
         train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 
@@ -74,36 +77,36 @@ def main(random_walk_name, tune=False):
         classifier.train(train_dataloader)
         sys.stdout.write("Training completed.\n")
 
-        # Initialize classifier for validation with the specified random walk strategy
-        classifier = RandomWalkClassifier(valid_graph, random_walk_name, device=device)
+    # Initialize classifier for validation with the specified random walk strategy
+    classifier = RandomWalkClassifier(valid_graph, random_walk_name, device=device)
 
-        valid_dataloader = DataLoader(valid_dataset, batch_size=8)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=8)
 
-        # Evaluate the model on validation data
-        sys.stdout.write("Evaluating the model on validation data...\n")
-        classifier.evaluate(valid_dataloader)
-        sys.stdout.write("Validation evaluation completed.\n")
+    # Evaluate the model on validation data
+    sys.stdout.write("Evaluating the model on validation data...\n")
+    classifier.evaluate(valid_dataloader)
+    sys.stdout.write("Validation evaluation completed.\n")
 
-        # Initialize classifier for testing with the specified random walk strategy
-        classifier = RandomWalkClassifier(test_graph, random_walk_name, device=device)
+    # Initialize classifier for testing with the specified random walk strategy
+    classifier = RandomWalkClassifier(test_graph, random_walk_name, device=device)
 
-        # Generate test walks
-        sys.stdout.write("Generating test walks...\n")
-        test_valid_walks = classifier.generate_random_walks(num_walks=100, walk_length=5)
-        test_invalid_walks = classifier.generate_invalid_random_walks(num_walks=100, walk_length=5)
-        sys.stdout.write(
-            f"Generated {len(test_valid_walks)} valid test walks and {len(test_invalid_walks)} invalid test walks.\n")
-        sys.stdout.write(f"Valid test walks: {test_valid_walks}\n")
-        sys.stdout.write(f"Invalid test walks: {test_invalid_walks}\n")
+    # Generate test walks
+    sys.stdout.write("Generating test walks...\n")
+    test_valid_walks = classifier.generate_random_walks(num_walks=100, walk_length=5)
+    test_invalid_walks = classifier.generate_invalid_random_walks(num_walks=100, walk_length=5)
+    sys.stdout.write(
+        f"Generated {len(test_valid_walks)} valid test walks and {len(test_invalid_walks)} invalid test walks.\n")
+    sys.stdout.write(f"Valid test walks: {test_valid_walks}\n")
+    sys.stdout.write(f"Invalid test walks: {test_invalid_walks}\n")
 
-        test_dataset = classifier.prepare_data(test_valid_walks, test_invalid_walks)
+    test_dataset = classifier.prepare_data(test_valid_walks, test_invalid_walks)
 
-        test_dataloader = DataLoader(test_dataset, batch_size=8)
+    test_dataloader = DataLoader(test_dataset, batch_size=8)
 
-        # Evaluate the model on test data
-        sys.stdout.write("Evaluating the model on test data...\n")
-        classifier.evaluate(test_dataloader)
-        sys.stdout.write("Test evaluation completed.\n")
+    # Evaluate the model on test data
+    sys.stdout.write("Evaluating the model on test data...\n")
+    classifier.evaluate(test_dataloader)
+    sys.stdout.write("Test evaluation completed.\n")
 
 
 if __name__ == "__main__":
