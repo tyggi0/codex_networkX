@@ -11,8 +11,8 @@ from ray.tune.schedulers import ASHAScheduler
 from ray.tune import CLIReporter
 from evaluate import load
 
-from brownian_motion_random_walk import BrownianMotionRandomWalk
-from ergrw_random_walk import ERGRWRandomWalk
+from random_walk_classifier.brownian_motion_random_walk import BrownianMotionRandomWalk
+from random_walk_classifier.ergrw_random_walk import ERGRWRandomWalk
 
 
 class RandomWalkClassifier:
