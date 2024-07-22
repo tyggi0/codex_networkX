@@ -9,9 +9,10 @@ import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 from ray.tune import CLIReporter
+from evaluate import load
 
-from random_walk_classifier.brownian_motion_random_walk import BrownianMotionRandomWalk
-from random_walk_classifier.ergrw_random_walk import ERGRWRandomWalk
+from brownian_motion_random_walk import BrownianMotionRandomWalk
+from ergrw_random_walk import ERGRWRandomWalk
 
 
 class RandomWalkClassifier:
@@ -21,18 +22,8 @@ class RandomWalkClassifier:
         self.device = device
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
-        self.optimizer = AdamW(self.model.parameters(), lr=1e-5)
-        self.metric = load_metric('accuracy')
-
-    def set_hyperparameters(self, learning_rate, batch_size, epochs):
-        self.learning_rate = learning_rate
-        self.batch_size = batch_size
-        self.epochs = epochs
-        self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
-        self.optimizer = AdamW(self.model.parameters(), lr=self.learning_rate)
-
-    def get_dataloader(self, dataset):
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=1e-5)
+        self.metric = load('accuracy', trust_remote_code=True)
 
     def get_random_walk_strategy(self, name):
         if name == "BrownianMotion":
@@ -65,7 +56,8 @@ class RandomWalkClassifier:
         return invalid_walks
 
     def encode_walks(self, walks):
-        return [self.tokenizer(' '.join(map(str, walk)), truncation=True, padding='max_length', max_length=512) for walk in walks]
+        return [self.tokenizer(' '.join(map(str, walk)), truncation=True, padding='max_length', max_length=512) for walk
+                in walks]
 
     def prepare_data(self, valid_walks, invalid_walks):
         encoded_valid_walks = self.encode_walks(valid_walks)
@@ -149,8 +141,22 @@ class RandomWalkClassifier:
         ray.shutdown()
 
         best_trial = analysis.get_best_trial("accuracy", "max", "last")
-        print(f"Best trial config: {best_trial.config}")
-        print(f"Best trial final validation accuracy: {analysis.last_result['accuracy']}")
+        best_config = best_trial.config
+
+        print(f"Best trial config: {best_config}")
+        print(f"Best trial final validation accuracy: {analysis.best_result['accuracy']}")
+
+        return best_config
+
+    def set_hyperparameters(self, learning_rate, batch_size, epochs):
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.learning_rate)
+
+    def get_dataloader(self, dataset):
+        return DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
 
     def train(self, dataloader, epochs=3):
         self.model.train()
