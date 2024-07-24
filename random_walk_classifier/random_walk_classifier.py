@@ -28,6 +28,10 @@ class RandomWalkClassifier:
         walks = encoded_valid_walks + encoded_invalid_walks
         labels = labels_valid + labels_invalid
 
+        print(f"Total encoded valid walks: {len(encoded_valid_walks)}")
+        print(f"Total encoded invalid walks: {len(encoded_invalid_walks)}")
+        print(f"Total combined walks: {len(walks)}")
+
         return walks, labels
 
     class WalkDataset(Dataset):
@@ -68,12 +72,12 @@ def prepare_datasets(generator, classifier, num_walks, walk_length):
     invalid_walks = generator.generate_invalid_random_walks(num_walks, walk_length)
 
     print("Valid Walks:")
-    for walk in valid_walks:
-        print(walk)
+    for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
+        print(f"Walk {i + 1}: {walk}")
 
     print("\nInvalid Walks:")
-    for walk in invalid_walks:
-        print(walk)
+    for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
+        print(f"Walk {i + 1}: {walk}")
 
     walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
     return RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
@@ -97,6 +101,7 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
     best_score = float('-inf')
 
     for params in ParameterGrid(param_grid):
+        print(f"Trying parameters: {params}")
         training_args = TrainingArguments(
             output_dir="./results",
             evaluation_strategy="epoch",
@@ -114,6 +119,8 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
 
         trainer.train()
         eval_results = trainer.evaluate()
+
+        print(f"Evaluation results: {eval_results}")
 
         if eval_results['eval_accuracy'] > best_score:
             best_score = eval_results['eval_accuracy']
@@ -185,14 +192,14 @@ def main(random_walk_name, tune):
         trainer.args = training_args
 
     # Train the model
-    print("Training the model...")
-    trainer.train()
-    print("Training completed.")
+    print("Evaluating the model on training dataset...")
+    train_results = trainer.evaluate(eval_dataset=train_dataset)
+    print(f"Training dataset evaluation results: {train_results}")
 
     # Evaluate the model on test data
     print("Evaluating the model on test dataset...")
-    trainer.evaluate(eval_dataset=test_dataset)
-    print("Test evaluation completed.")
+    test_results = trainer.evaluate(eval_dataset=test_dataset)
+    print(f"Test dataset evaluation results: {test_results}")
 
 
 if __name__ == "__main__":
