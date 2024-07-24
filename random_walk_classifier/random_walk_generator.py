@@ -19,22 +19,21 @@ class RandomWalkGenerator:
     def generate_random_walks(self, num_walks, walk_length):
         return self.random_walk.generate_walks(num_walks, walk_length)
 
-    def generate_invalid_random_walks(self, num_walks, walk_length, random_prob=0.5):
+    def generate_invalid_random_walks(self, valid_walks, corruption_prob=0.5):
         nodes = list(self.graph.nodes)
+        edges = list(self.graph.edges(data=True))
         invalid_walks = []
-        for _ in range(num_walks):
-            walk = []
-            current_node = random.choice(nodes)
-            for _ in range(walk_length):
-                walk.append(current_node)
-                if random.random() < random_prob:
-                    current_node = random.choice(nodes)
-                else:
-                    neighbors = list(self.graph.neighbors(current_node))
-                    if neighbors:
-                        current_node = random.choice(neighbors)
-                    else:
-                        break
-            invalid_walks.append(walk)
+
+        for walk in valid_walks:
+            invalid_walk = walk.copy()
+            for i in range(len(invalid_walk)):
+                if random.random() < corruption_prob:
+                    if i % 2 == 0:  # Change entity
+                        invalid_walk[i] = random.choice(nodes)
+                    else:  # Change relation
+                        random_edge = random.choice(edges)
+                        invalid_walk[i] = random_edge[2]['relation']
+            invalid_walks.append(invalid_walk)
+
         return invalid_walks
 
