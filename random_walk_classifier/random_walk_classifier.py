@@ -90,7 +90,8 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
     param_grid = {
         'learning_rate': [1e-5, 3e-5, 5e-5],
         'num_train_epochs': [2, 3, 4],
-        'per_device_train_batch_size': [16, 32]
+        'per_device_train_batch_size': [8, 16],  # Reduced batch sizes to avoid OutOfMemoryError: CUDA out of memory.
+        # per_device_train_batch_size was [16, 32]
     }
     best_params = None
     best_score = float('-inf')
