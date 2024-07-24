@@ -61,13 +61,14 @@ class ERGRWRandomWalk:
         # print(f"Completed walk: {walk}")
         return walk
 
-    def generate_walks(self, num_walks, walk_length):
+    def generate_walks(self, num_walks, walk_length, min_walk_length=3):
         """ Generate a specified number of random walks of a given length. """
         walks = []
         nodes = list(self.G.nodes)
-        for i in range(num_walks):
+        while len(walks) < num_walks:
             start_node = random.choice(nodes)
             # print(f"Generating walk {i + 1}/{num_walks} from {start_node}")
             walk = self.generate_walk(start_node, walk_length)
-            walks.append(walk)
+            if len(walk) >= min_walk_length:
+                walks.append(walk)
         return walks
