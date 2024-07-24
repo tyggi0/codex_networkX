@@ -25,28 +25,31 @@ class ERGRWRandomWalk:
 
     def generate_walk(self, start_node, walk_length):
         """ Generate a single walk from a given start node. """
-        walk = []
+        walk = [start_node]
         current = start_node
-        for _ in range(walk_length):
+        step = 0
+
+        while step < walk_length - 1:
             if random.random() < self.alpha:
-                # Rule1 walk step
+                # Apply Rule1 (entity-to-entity)
                 next_node = self.rule1_walk(current)
                 if next_node:
-                    walk.append(current)
+                    walk.append(next_node)
                     current = next_node
+                    step += 1
                 else:
-                    break
+                    continue  # If no valid move, attempt another step
             else:
-                # Rule2 walk step
+                # Apply Rule2 (entity-relation)
                 relation, next_node = self.rule2_walk(current)
                 if next_node:
-                    walk.append(current)
                     walk.append(relation)
+                    walk.append(next_node)
                     current = next_node
+                    step += 2
                 else:
-                    break
-        if len(walk) < walk_length:
-            walk.append(current)
+                    continue  # If no valid move, attempt another step
+
         return walk
 
     def generate_walks(self, num_walks, walk_length):
