@@ -5,7 +5,6 @@ from codex.codex import Codex
 from graph_handler import GraphHandler
 from random_walk_generator import RandomWalkGenerator
 from sklearn.model_selection import ParameterGrid
-from accelerate import Accelerator
 
 
 class RandomWalkClassifier:
@@ -52,7 +51,7 @@ def prepare_datasets(generator, classifier, num_walks, walk_length):
     return RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
 
 
-def tune_hyperparameters(accelerator, trainer, train_dataset, valid_dataset):
+def tune_hyperparameters(trainer, train_dataset, valid_dataset):
     param_grid = {
         'learning_rate': [1e-5, 3e-5, 5e-5],
         'num_train_epochs': [2, 3, 4],
@@ -76,7 +75,6 @@ def tune_hyperparameters(accelerator, trainer, train_dataset, valid_dataset):
         trainer.args = training_args
         trainer.train_dataset = train_dataset
         trainer.eval_dataset = valid_dataset
-        trainer.accelerator = accelerator
 
         trainer.train()
         eval_results = trainer.evaluate()
@@ -91,7 +89,6 @@ def tune_hyperparameters(accelerator, trainer, train_dataset, valid_dataset):
 
 def main(random_walk_name, tune):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    accelerator = Accelerator()
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
@@ -137,7 +134,7 @@ def main(random_walk_name, tune):
 
     if tune:
         print("Tuning hyperparameters...")
-        best_params = tune_hyperparameters(accelerator, trainer, train_dataset, valid_dataset)
+        best_params = tune_hyperparameters(trainer, train_dataset, valid_dataset)
         training_args = TrainingArguments(
             output_dir="./results",
             evaluation_strategy="epoch",
