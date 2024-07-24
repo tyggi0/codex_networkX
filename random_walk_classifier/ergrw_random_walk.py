@@ -49,7 +49,7 @@ class ERGRWRandomWalk:
             walk.append(current)
         return walk
 
-    def generate_random_walks(self, num_walks, walk_length):
+    def generate_walks(self, num_walks, walk_length):
         """ Generate a specified number of random walks of a given length. """
         walks = []
         nodes = list(self.G.nodes)
