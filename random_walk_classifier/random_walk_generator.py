@@ -1,6 +1,6 @@
 import random
-from .brownian_motion_random_walk import BrownianMotionRandomWalk
-from .ergrw_random_walk import ERGRWRandomWalk
+from brownian_motion_random_walk import BrownianMotionRandomWalk
+from ergrw_random_walk import ERGRWRandomWalk
 
 
 class RandomWalkGenerator:
