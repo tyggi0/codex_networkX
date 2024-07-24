@@ -81,8 +81,8 @@ def prepare_datasets(generator, classifier, num_walks, walk_length):
 
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
-    predictions = torch.argmax(logits, dim=-1)
-    accuracy = accuracy_score(labels, predictions)
+    predictions = torch.argmax(torch.tensor(logits), dim=-1)
+    accuracy = accuracy_score(torch.tensor(labels), predictions)
     return {"accuracy": accuracy}
 
 
