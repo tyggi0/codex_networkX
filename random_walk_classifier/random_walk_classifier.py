@@ -7,6 +7,10 @@ from random_walk_generator import RandomWalkGenerator
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import accuracy_score
 
+train_num_walks = 100
+valid_num_walks = 100
+test_num_walks = 100
+
 
 class RandomWalkClassifier:
     def __init__(self, device):
@@ -67,7 +71,7 @@ class RandomWalkClassifier:
             }
 
 
-def prepare_datasets(generator, classifier, num_walks, walk_length):
+def prepare_datasets(generator, classifier, num_walks, walk_length=6):
     valid_walks = generator.generate_random_walks(num_walks, walk_length)
     invalid_walks = generator.generate_invalid_random_walks(num_walks, walk_length)
 
@@ -150,11 +154,11 @@ def main(random_walk_name, tune):
 
     # Prepare datasets
     print("Preparing train dataset...")
-    train_dataset = prepare_datasets(train_generator, classifier, num_walks=100, walk_length=5)
+    train_dataset = prepare_datasets(train_generator, classifier, num_walks=train_num_walks)
     print("Preparing validation dataset...")
-    valid_dataset = prepare_datasets(valid_generator, classifier, num_walks=100, walk_length=5)
+    valid_dataset = prepare_datasets(valid_generator, classifier, num_walks=valid_num_walks)
     print("Preparing test dataset...")
-    test_dataset = prepare_datasets(test_generator, classifier, num_walks=100, walk_length=5)
+    test_dataset = prepare_datasets(test_generator, classifier, num_walks=test_num_walks)
 
     # Set up the training arguments
     training_args = TrainingArguments(
