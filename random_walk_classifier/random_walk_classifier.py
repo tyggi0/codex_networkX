@@ -64,6 +64,15 @@ class RandomWalkClassifier:
 def prepare_datasets(generator, classifier, num_walks, walk_length):
     valid_walks = generator.generate_random_walks(num_walks, walk_length)
     invalid_walks = generator.generate_invalid_random_walks(num_walks, walk_length)
+
+    print("Valid Walks:")
+    for walk in valid_walks:
+        print(walk)
+
+    print("\nInvalid Walks:")
+    for walk in invalid_walks:
+        print(walk)
+
     walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
     return RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
 
