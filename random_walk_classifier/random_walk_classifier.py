@@ -13,8 +13,9 @@ class RandomWalkClassifier:
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
 
-    def encode_walks(self, walks):
-        return [self.tokenizer.encode(' '.join(map(str, walk)), add_special_tokens=True) for walk in walks]
+    @staticmethod
+    def encode_walks(walks):
+        return [' '.join(map(str, walk)) for walk in walks]
 
     def prepare_data(self, valid_walks, invalid_walks):
         encoded_valid_walks = self.encode_walks(valid_walks)
@@ -40,15 +41,24 @@ class RandomWalkClassifier:
         def __getitem__(self, idx):
             walk = self.walks[idx]
             label = self.labels[idx]
-            encoding = self.tokenizer(walk, return_tensors='pt', padding='max_length', truncation=True, max_length=512)
-            return {**encoding, 'labels': torch.tensor(label, dtype=torch.long)}
+            walk_str = ' '.join(map(str, walk))
+            encoding = self.tokenizer(walk_str, return_tensors='pt', padding='max_length', truncation=True, max_length=512)
+            return {
+                'input_ids': encoding['input_ids'].squeeze(),
+                'attention_mask': encoding['attention_mask'].squeeze(),
+                'labels': torch.tensor(label, dtype=torch.long)
+            }
 
         @staticmethod
         def collate_fn(batch):
             input_ids = torch.stack([item['input_ids'] for item in batch])
             attention_masks = torch.stack([item['attention_mask'] for item in batch])
             labels = torch.tensor([item['labels'] for item in batch])
-            return input_ids, attention_masks, labels
+            return {
+                'input_ids': input_ids,
+                'attention_mask': attention_masks,
+                'labels': labels
+            }
 
 
 def prepare_datasets(generator, classifier, num_walks, walk_length):
