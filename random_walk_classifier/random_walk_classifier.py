@@ -5,6 +5,7 @@ from codex.codex import Codex
 from graph_handler import GraphHandler
 from random_walk_generator import RandomWalkGenerator
 from sklearn.model_selection import ParameterGrid
+from sklearn.metrics import accuracy_score
 
 
 class RandomWalkClassifier:
@@ -42,7 +43,8 @@ class RandomWalkClassifier:
             walk = self.walks[idx]
             label = self.labels[idx]
             walk_str = ' '.join(map(str, walk))
-            encoding = self.tokenizer(walk_str, return_tensors='pt', padding='max_length', truncation=True, max_length=512)
+            encoding = self.tokenizer(walk_str, return_tensors='pt', padding='max_length', truncation=True,
+                                      max_length=512)
             return {
                 'input_ids': encoding['input_ids'].squeeze(),
                 'attention_mask': encoding['attention_mask'].squeeze(),
@@ -77,6 +79,13 @@ def prepare_datasets(generator, classifier, num_walks, walk_length):
     return RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
 
 
+def compute_metrics(eval_pred):
+    logits, labels = eval_pred
+    predictions = torch.argmax(logits, dim=-1)
+    accuracy = accuracy_score(labels, predictions)
+    return {"accuracy": accuracy}
+
+
 def tune_hyperparameters(trainer, train_dataset, valid_dataset):
     param_grid = {
         'learning_rate': [1e-5, 3e-5, 5e-5],
@@ -105,8 +114,8 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
         trainer.train()
         eval_results = trainer.evaluate()
 
-        if eval_results['eval_accuracy'] > best_score:
-            best_score = eval_results['eval_accuracy']
+        if eval_results['accuracy'] > best_score:
+            best_score = eval_results['accuracy']
             best_params = params
 
     print(f"Best parameters found: {best_params} with accuracy {best_score}")
@@ -156,7 +165,8 @@ def main(random_walk_name, tune):
         train_dataset=train_dataset,
         eval_dataset=valid_dataset,
         tokenizer=classifier.tokenizer,
-        data_collator=RandomWalkClassifier.WalkDataset.collate_fn
+        data_collator=RandomWalkClassifier.WalkDataset.collate_fn,
+        compute_metrics=compute_metrics
     )
 
     if tune:
