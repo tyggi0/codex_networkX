@@ -19,7 +19,7 @@ class RandomWalkGenerator:
     def generate_random_walks(self, num_walks, walk_length):
         return self.random_walk.generate_walks(num_walks, walk_length)
 
-    def generate_invalid_random_walks(self, num_walks, walk_length):
+    def generate_invalid_random_walks(self, num_walks, walk_length, random_prob=0.7):
         nodes = list(self.graph.nodes)
         invalid_walks = []
         for _ in range(num_walks):
@@ -27,7 +27,7 @@ class RandomWalkGenerator:
             current_node = random.choice(nodes)
             for _ in range(walk_length):
                 walk.append(current_node)
-                if random.random() > 0.5:
+                if random.random() < random_prob:
                     current_node = random.choice(nodes)
                 else:
                     neighbors = list(self.graph.neighbors(current_node))
