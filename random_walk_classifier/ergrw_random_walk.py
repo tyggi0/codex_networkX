@@ -7,16 +7,14 @@ class ERGRWRandomWalk:
         self.G = graph
         self.alpha = alpha
 
-    def rule1_walk(self, current):
+    def rule1_walk(self, current, neighbors):
         """ Perform a Rule1 (entity-to-entity) walk step. """
-        neighbors = list(self.G.neighbors(current))
         if neighbors:
             return random.choice(neighbors)
         return None
 
-    def rule2_walk(self, current):
+    def rule2_walk(self, current, neighbors):
         """ Perform a Rule2 (entity-relation) walk step. """
-        neighbors = list(self.G.neighbors(current))
         if neighbors:
             next_node = random.choice(neighbors)
             relation = self.G[current][next_node]['relation']
@@ -31,9 +29,14 @@ class ERGRWRandomWalk:
         step = 0
 
         while step < walk_length - 1:
+            neighbors = list(self.G.neighbors(current))
+            if not neighbors:
+                print(f"No neighbors found for {current}. Ending walk early.")
+                break
+
             if random.random() < self.alpha:
                 # Apply Rule1 (entity-to-entity)
-                next_node = self.rule1_walk(current)
+                next_node = self.rule1_walk(current, neighbors)
                 if next_node:
                     print(f"Rule1: Moving from {current} to {next_node}")
                     walk.append(next_node)
@@ -44,7 +47,7 @@ class ERGRWRandomWalk:
                     continue  # If no valid move, attempt another step
             else:
                 # Apply Rule2 (entity-relation)
-                relation, next_node = self.rule2_walk(current)
+                relation, next_node = self.rule2_walk(current, neighbors)
                 if next_node:
                     print(f"Rule2: Moving from {current} via {relation} to {next_node}")
                     walk.append(relation)
