@@ -83,7 +83,7 @@ def compute_metrics(eval_pred):
     logits, labels = eval_pred
     predictions = torch.argmax(torch.tensor(logits), dim=-1)
     accuracy = accuracy_score(torch.tensor(labels), predictions)
-    return {"accuracy": accuracy}
+    return {"eval_accuracy": accuracy}
 
 
 def tune_hyperparameters(trainer, train_dataset, valid_dataset):
@@ -114,8 +114,8 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
         trainer.train()
         eval_results = trainer.evaluate()
 
-        if eval_results['accuracy'] > best_score:
-            best_score = eval_results['accuracy']
+        if eval_results['eval_accuracy'] > best_score:
+            best_score = eval_results['eval_accuracy']
             best_params = params
 
     print(f"Best parameters found: {best_params} with accuracy {best_score}")
