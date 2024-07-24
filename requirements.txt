@@ -8,8 +8,8 @@ tqdm
 networkx
 node2vec
 numpy
-transformers>=4.0.0
-accelerate>=0.10.0
+transformers==4.28.1
+accelerate==0.15.0
 torch>=1.8.0
 ray[tune]
 scikit-learn

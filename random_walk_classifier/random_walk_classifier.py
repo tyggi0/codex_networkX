@@ -43,6 +43,13 @@ class RandomWalkClassifier:
             encoding = self.tokenizer(walk, return_tensors='pt', padding='max_length', truncation=True, max_length=512)
             return {**encoding, 'labels': torch.tensor(label, dtype=torch.long)}
 
+        @staticmethod
+        def collate_fn(batch):
+            input_ids = torch.stack([item['input_ids'] for item in batch])
+            attention_masks = torch.stack([item['attention_mask'] for item in batch])
+            labels = torch.tensor([item['labels'] for item in batch])
+            return input_ids, attention_masks, labels
+
 
 def prepare_datasets(generator, classifier, num_walks, walk_length):
     valid_walks = generator.generate_random_walks(num_walks, walk_length)
@@ -130,6 +137,7 @@ def main(random_walk_name, tune):
         train_dataset=train_dataset,
         eval_dataset=valid_dataset,
         tokenizer=classifier.tokenizer,
+        data_collator=RandomWalkClassifier.WalkDataset.collate_fn
     )
 
     if tune:
