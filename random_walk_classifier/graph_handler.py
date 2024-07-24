@@ -9,7 +9,7 @@ class GraphHandler:
         self.test_graph = None
 
     def construct_labeled_graph(self, triples):
-        G = nx.Graph()
+        G = nx.DiGraph()
         for head, relation, tail in triples.values:
             head_label = self.codex.entity_label(head)
             relation_label = self.codex.relation_label(relation)

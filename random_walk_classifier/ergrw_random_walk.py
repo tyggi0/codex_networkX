@@ -1,42 +1,60 @@
-import numpy as np
 import networkx as nx
+import random
 
 
 class ERGRWRandomWalk:
-    def __init__(self, G: nx.Graph, alpha=0.5):
-        self.G = G
+    def __init__(self, graph: nx.Graph, alpha=0.5):
+        self.G = graph
         self.alpha = alpha
-        self.entities = list(G.nodes)
-        self.relations = list(set(edge[2]['relation'] for edge in G.edges(data=True)))
 
-    def rule1_walk(self, start_node, walk_length):
-        walk = [start_node]
+    def rule1_walk(self, current):
+        """ Perform a Rule1 (entity-to-entity) walk step. """
+        neighbors = list(self.G.neighbors(current))
+        if neighbors:
+            return random.choice(neighbors)
+        return None
+
+    def rule2_walk(self, current):
+        """ Perform a Rule2 (entity-relation) walk step. """
+        neighbors = list(self.G.neighbors(current))
+        if neighbors:
+            next_node = random.choice(neighbors)
+            relation = self.G[current][next_node]['relation']
+            return relation, next_node
+        return None, None
+
+    def generate_walk(self, start_node, walk_length):
+        """ Generate a single walk from a given start node. """
+        walk = []
+        current = start_node
         for _ in range(walk_length):
-            neighbors = list(self.G.neighbors(walk[-1]))
-            if not neighbors:
-                break
-            next_node = np.random.choice(neighbors)
-            walk.append(next_node)
-        return walk
-
-    def rule2_walk(self, start_node, walk_length):
-        walk = [start_node]
-        for _ in range(walk_length // 2):
-            # Entity to Relation
-            neighbors = [(nbr, self.G[start_node][nbr]['relation']) for nbr in self.G.neighbors(start_node)]
-            if not neighbors:
-                break
-            next_node, relation = neighbors[np.random.choice(len(neighbors))]
-            walk.extend([relation, next_node])
-            start_node = next_node
-        return walk
-
-    def generate_walks(self, num_walks, walk_length):
-        walks = []
-        for _ in range(num_walks):
-            entity = np.random.choice(self.entities)
-            if np.random.rand() < self.alpha:
-                walks.append(self.rule1_walk(entity, walk_length))
+            if random.random() < self.alpha:
+                # Rule1 walk step
+                next_node = self.rule1_walk(current)
+                if next_node:
+                    walk.append(current)
+                    current = next_node
+                else:
+                    break
             else:
-                walks.append(self.rule2_walk(entity, walk_length))
+                # Rule2 walk step
+                relation, next_node = self.rule2_walk(current)
+                if next_node:
+                    walk.append(current)
+                    walk.append(relation)
+                    current = next_node
+                else:
+                    break
+        if len(walk) < walk_length:
+            walk.append(current)
+        return walk
+
+    def generate_random_walks(self, num_walks, walk_length):
+        """ Generate a specified number of random walks of a given length. """
+        walks = []
+        nodes = list(self.G.nodes)
+        for _ in range(num_walks):
+            start_node = random.choice(nodes)
+            walk = self.generate_walk(start_node, walk_length)
+            walks.append(walk)
         return walks

@@ -150,7 +150,7 @@ def main(random_walk_name, tune):
 
     # Prepare datasets
     print("Preparing train dataset...")
-    train_dataset = prepare_datasets(train_generator, classifier, num_walks=5000, walk_length=5)
+    train_dataset = prepare_datasets(train_generator, classifier, num_walks=100, walk_length=5)
     print("Preparing validation dataset...")
     valid_dataset = prepare_datasets(valid_generator, classifier, num_walks=100, walk_length=5)
     print("Preparing test dataset...")
