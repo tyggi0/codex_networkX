@@ -2,8 +2,8 @@ import torch
 from transformers import BertTokenizer, BertForSequenceClassification, TrainingArguments, Trainer
 from torch.utils.data import Dataset
 from codex.codex import Codex
-from random_walk_classifier.graph_handler import GraphHandler
-from random_walk_classifier.random_walk_generator import RandomWalkGenerator
+from .graph_handler import GraphHandler
+from .random_walk_generator import RandomWalkGenerator
 from sklearn.model_selection import ParameterGrid
 from accelerate import Accelerator
 
