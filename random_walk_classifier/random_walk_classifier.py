@@ -1,51 +1,18 @@
-import random
 import torch
-import networkx as nx
 from transformers import BertTokenizer, BertForSequenceClassification, TrainingArguments, Trainer
 from torch.utils.data import Dataset
-from brownian_motion_random_walk import BrownianMotionRandomWalk
-from ergrw_random_walk import ERGRWRandomWalk
 from codex.codex import Codex
+from random_walk_classifier.graph_handler import GraphHandler
+from random_walk_classifier.random_walk_generator import RandomWalkGenerator
 from sklearn.model_selection import ParameterGrid
+from accelerate import Accelerator
 
 
 class RandomWalkClassifier:
-    def __init__(self, graph: nx.Graph, random_walk_strategy, device):
-        self.graph = graph
-        self.random_walk = self.get_random_walk_strategy(random_walk_strategy)
+    def __init__(self, device):
         self.device = device
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
-
-    def get_random_walk_strategy(self, name):
-        if name == "BrownianMotion":
-            return BrownianMotionRandomWalk(self.graph)
-        elif name == "ERGRW":
-            return ERGRWRandomWalk(self.graph)
-        else:
-            raise ValueError(f"Unknown random walk strategy: {name}")
-
-    def generate_random_walks(self, num_walks, walk_length):
-        return self.random_walk.generate_walks(num_walks, walk_length)
-
-    def generate_invalid_random_walks(self, num_walks, walk_length):
-        nodes = list(self.graph.nodes)
-        invalid_walks = []
-        for _ in range(num_walks):
-            walk = []
-            current_node = random.choice(nodes)
-            for _ in range(walk_length):
-                walk.append(current_node)
-                if random.random() > 0.5:
-                    current_node = random.choice(nodes)
-                else:
-                    neighbors = list(self.graph.neighbors(current_node))
-                    if neighbors:
-                        current_node = random.choice(neighbors)
-                    else:
-                        break
-            invalid_walks.append(walk)
-        return invalid_walks
 
     def encode_walks(self, walks):
         return [self.tokenizer.encode(' '.join(map(str, walk)), add_special_tokens=True) for walk in walks]
@@ -78,24 +45,14 @@ class RandomWalkClassifier:
             return {**encoding, 'labels': torch.tensor(label, dtype=torch.long)}
 
 
-def construct_labeled_graph(triples, codex):
-    G = nx.Graph()
-    for head, relation, tail in triples.values:
-        head_label = codex.entity_label(head)
-        relation_label = codex.relation_label(relation)
-        tail_label = codex.entity_label(tail)
-        G.add_edge(head_label, tail_label, relation=relation_label)
-    return G
-
-
-def prepare_datasets(classifier, graph, num_walks, walk_length):
-    valid_walks = classifier.generate_random_walks(num_walks, walk_length)
-    invalid_walks = classifier.generate_invalid_random_walks(num_walks, walk_length)
+def prepare_datasets(generator, classifier, num_walks, walk_length):
+    valid_walks = generator.generate_random_walks(num_walks, walk_length)
+    invalid_walks = generator.generate_invalid_random_walks(num_walks, walk_length)
     walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
     return RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
 
 
-def tune_hyperparameters(trainer, train_dataset, valid_dataset):
+def tune_hyperparameters(accelerator, trainer, train_dataset, valid_dataset):
     param_grid = {
         'learning_rate': [1e-5, 3e-5, 5e-5],
         'num_train_epochs': [2, 3, 4],
@@ -119,6 +76,7 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
         trainer.args = training_args
         trainer.train_dataset = train_dataset
         trainer.eval_dataset = valid_dataset
+        trainer.accelerator = accelerator
 
         trainer.train()
         eval_results = trainer.evaluate()
@@ -133,41 +91,30 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
 
 def main(random_walk_name, tune):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    accelerator = Accelerator()
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
 
-    # Access entities, relations, and triples
-    entities = codex.entities()
-    relations = codex.relations()
-    triples = codex.triples()
+    # Initialize GraphHandler and load graphs
+    graph_handler = GraphHandler(codex)
+    train_graph, valid_graph, test_graph = graph_handler.load_graphs()
 
-    print(f"Number of entities: {len(entities)}")
-    print(f"Number of relations: {len(relations)}")
-    print(f"Number of triples: {len(triples)}")
+    # Initialize classifier
+    classifier = RandomWalkClassifier(device=device)
 
-    # Access train, validation, and test triples
-    train_triples = codex.split("train")
-    valid_triples = codex.split("valid")
-    test_triples = codex.split("test")
-
-    print("Constructing labeled graphs...")
-    # Construct graphs with labeled triples
-    train_graph = construct_labeled_graph(train_triples, codex)
-    valid_graph = construct_labeled_graph(valid_triples, codex)
-    test_graph = construct_labeled_graph(test_triples, codex)
-    print("Graphs constructed successfully.")
-
-    # Initialize classifier with the specified random walk strategy
-    classifier = RandomWalkClassifier(train_graph, random_walk_name, device=device)
+    # Initialize RandomWalkGenerators
+    train_generator = RandomWalkGenerator(train_graph, random_walk_name)
+    valid_generator = RandomWalkGenerator(valid_graph, random_walk_name)
+    test_generator = RandomWalkGenerator(test_graph, random_walk_name)
 
     # Prepare datasets
     print("Preparing train dataset...")
-    train_dataset = prepare_datasets(classifier, train_graph, num_walks=500, walk_length=5)
+    train_dataset = prepare_datasets(train_generator, classifier, num_walks=500, walk_length=5)
     print("Preparing validation dataset...")
-    valid_dataset = prepare_datasets(classifier, valid_graph, num_walks=100, walk_length=5)
+    valid_dataset = prepare_datasets(valid_generator, classifier, num_walks=100, walk_length=5)
     print("Preparing test dataset...")
-    test_dataset = prepare_datasets(classifier, test_graph, num_walks=100, walk_length=5)
+    test_dataset = prepare_datasets(test_generator, classifier, num_walks=100, walk_length=5)
 
     # Set up the training arguments
     training_args = TrainingArguments(
@@ -190,7 +137,7 @@ def main(random_walk_name, tune):
 
     if tune:
         print("Tuning hyperparameters...")
-        best_params = tune_hyperparameters(trainer, train_dataset, valid_dataset)
+        best_params = tune_hyperparameters(accelerator, trainer, train_dataset, valid_dataset)
         training_args = TrainingArguments(
             output_dir="./results",
             evaluation_strategy="epoch",
@@ -217,7 +164,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Random Walk Classifier')
-    parser.add_argument('--random_walk', type=str, required=True, help='Name of the random walk strategy (BrownianMotion, ERGRW)')
+    parser.add_argument('--random_walk', type=str, required=True,
+                        help='Name of the random walk strategy (BrownianMotion, ERGRW)')
     parser.add_argument('--tune', action='store_true', help='Flag to tune hyperparameters')
     args = parser.parse_args()
     main(args.random_walk, args.tune)
