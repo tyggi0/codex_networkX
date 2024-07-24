@@ -73,7 +73,7 @@ class RandomWalkClassifier:
 
 def prepare_datasets(generator, classifier, num_walks, walk_length=6):
     valid_walks = generator.generate_random_walks(num_walks, walk_length)
-    invalid_walks = generator.generate_invalid_random_walks(num_walks, walk_length)
+    invalid_walks = generator.generate_invalid_random_walks(valid_walks)
 
     print("Valid Walks:")
     for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
