@@ -34,9 +34,9 @@ class ERGRWRandomWalk:
     def generate_walks(self, num_walks, walk_length):
         walks = []
         for _ in range(num_walks):
-            for entity in self.entities:
-                if np.random.rand() < self.alpha:
-                    walks.append(self.rule1_walk(entity, walk_length))
-                else:
-                    walks.append(self.rule2_walk(entity, walk_length))
+            entity = np.random.choice(self.entities)
+            if np.random.rand() < self.alpha:
+                walks.append(self.rule1_walk(entity, walk_length))
+            else:
+                walks.append(self.rule2_walk(entity, walk_length))
         return walks
