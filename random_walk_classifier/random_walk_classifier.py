@@ -152,13 +152,13 @@ def main(random_walk_name, tune):
 
     # Initialize GraphHandler and load the graph
     graph_handler = GraphHandler(codex)
-    train_graph, _, _ = graph_handler.load_graphs()
+    graph = graph_handler.load_graphs()
 
     # Initialize classifier
     classifier = RandomWalkClassifier(device=device)
 
     # Initialize RandomWalkGenerator
-    generator = RandomWalkGenerator(train_graph, random_walk_name)
+    generator = RandomWalkGenerator(graph, random_walk_name)
 
     # Prepare datasets
     print("Preparing datasets...")
