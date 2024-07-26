@@ -7,9 +7,9 @@ from random_walk_generator import RandomWalkGenerator
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import accuracy_score
 
-train_num_walks = 100
-valid_num_walks = 100
-test_num_walks = 100
+train_num_walks = 6400
+valid_num_walks = 800
+test_num_walks = 800
 
 
 class RandomWalkClassifier:
