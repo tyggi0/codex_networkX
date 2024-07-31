@@ -7,7 +7,7 @@ from random_walk_generator import RandomWalkGenerator
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import accuracy_score
 
-num_walks = 8000
+num_walks = 4000
 
 
 class RandomWalkClassifier:
@@ -73,6 +73,14 @@ def prepare_datasets(generator, classifier, num_walks, walk_length=6):
     valid_walks = generator.generate_random_walks(num_walks, walk_length)
     invalid_walks = generator.generate_invalid_random_walks(valid_walks)
 
+    print("Valid Walks:")
+    for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
+        print(f"Walk {i + 1}: {walk}")
+
+    print("\nInvalid Walks:")
+    for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
+        print(f"Walk {i + 1}: {walk}")
+
     walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
     dataset = RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
 
@@ -82,17 +90,17 @@ def prepare_datasets(generator, classifier, num_walks, walk_length=6):
 
     train_dataset, valid_dataset, test_dataset = random_split(dataset, [train_size, valid_size, test_size])
 
-    print("\nFirst 10 walks in the training dataset:")
-    for i in range(10):
-        print(train_dataset[i])
-
-    print("\nFirst 10 walks in the validation dataset:")
-    for i in range(10):
-        print(valid_dataset[i])
-
-    print("\nFirst 10 walks in the test dataset:")
-    for i in range(10):
-        print(test_dataset[i])
+    # print("\nFirst 10 walks in the training dataset:")
+    # for i in range(10):
+    #     print(train_dataset[i])
+    #
+    # print("\nFirst 10 walks in the validation dataset:")
+    # for i in range(10):
+    #     print(valid_dataset[i])
+    #
+    # print("\nFirst 10 walks in the test dataset:")
+    # for i in range(10):
+    #     print(test_dataset[i])
 
     return train_dataset, valid_dataset, test_dataset
 
@@ -100,7 +108,7 @@ def prepare_datasets(generator, classifier, num_walks, walk_length=6):
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
     predictions = torch.argmax(torch.tensor(logits), dim=-1)
-    accuracy = accuracy_score(torch.tensor(labels), predictions)
+    accuracy = accuracy_score(torch.tensor(labels), predictions)  # TODO F1, confusion matrix (if necessry)
     return {"eval_accuracy": accuracy}
 
 
@@ -108,7 +116,7 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
     param_grid = {
         'learning_rate': [1e-5, 3e-5, 5e-5],
         'num_train_epochs': [2, 3, 4],
-        'per_device_train_batch_size': [8, 16],  # Reduced batch sizes to avoid OutOfMemoryError: CUDA out of memory.
+        'per_device_train_batch_size': [16, 32],  # Reduced batch sizes to avoid OutOfMemoryError: CUDA out of memory.
         # per_device_train_batch_size was [16, 32]
     }
     best_params = None

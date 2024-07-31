@@ -15,6 +15,7 @@ class GraphHandler:
             relation_label = self.codex.relation_label(relation)
             tail_label = self.codex.entity_label(tail)
             G.add_edge(head_label, tail_label, relation=relation_label)
+            G.add_edge(tail_label, head_label, relation="~"+relation_label)
         return G
 
     def load_graphs(self):
