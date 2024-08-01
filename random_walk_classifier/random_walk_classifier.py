@@ -168,6 +168,7 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
         training_args = TrainingArguments(
             output_dir="./results",
             evaluation_strategy="epoch",
+            logging_strategy="epoch",  # ELog training data stats for loss
             learning_rate=params['learning_rate'],
             per_device_train_batch_size=params['per_device_train_batch_size'],
             per_device_eval_batch_size=32,
@@ -216,11 +217,13 @@ def main(random_walk_name, tune, num_walks=4000):
     training_args = TrainingArguments(
         output_dir="./results",
         evaluation_strategy="epoch",
-        learning_rate=1e-4,
+        logging_strategy="epoch",
+        learning_rate=2e-5,  # Got 0.5 accurary with 1e-4
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
-        num_train_epochs=3,
+        num_train_epochs=5, # was 3
         weight_decay=0.01,
+        warmup_steps=500,  # Adding warmup steps
     )
 
     trainer = Trainer(
