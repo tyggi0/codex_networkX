@@ -87,7 +87,7 @@ def prepare_train_dataset(generator, classifier, num_walks, walk_length=6):
 
 def prepare_eval_dataset(classifier, codex, split):
     valid_triples = codex.split(split)
-    invalid_triples = codex.split(f"{split}_negatives")
+    invalid_triples = codex.negative_split(split)
 
     valid_walks = valid_triples.values.tolist()
     invalid_walks = invalid_triples.values.tolist()
