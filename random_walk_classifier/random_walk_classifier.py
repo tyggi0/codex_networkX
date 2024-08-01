@@ -79,16 +79,16 @@ def transform_triples(codex, triples):
 
 def prepare_train_dataset(generator, classifier, codex, num_walks, walk_length=6):
     # Generate random walks
-    valid_walks = generator.generate_random_walks(num_walks, walk_length)
-    invalid_walks = generator.generate_invalid_random_walks(valid_walks)
+    # valid_walks = generator.generate_random_walks(num_walks, walk_length)
+    # invalid_walks = generator.generate_invalid_random_walks(valid_walks)
 
-    print("Random Walks for Training:")
-    for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
-        print(f"Valid Walk {i + 1}: {walk}")
-    for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
-        print(f"Invalid Walk {i + 1}: {walk}")
-
-    walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
+    # print("Random Walks for Training:")
+    # for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
+    #     print(f"Valid Walk {i + 1}: {walk}")
+    # for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
+    #     print(f"Invalid Walk {i + 1}: {walk}")
+    #
+    # walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
 
     # Add triples from the train split
     train_triples = codex.split("train")
@@ -104,10 +104,10 @@ def prepare_train_dataset(generator, classifier, codex, num_walks, walk_length=6
 
     train_walks, train_labels = classifier.prepare_data(train_valid_walks, train_invalid_walks)
 
-    combined_walks = walks + train_walks
-    combined_labels = labels + train_labels
+    # combined_walks = walks + train_walks
+    # combined_labels = labels + train_labels
 
-    dataset = RandomWalkClassifier.WalkDataset(combined_walks, combined_labels, classifier.tokenizer)
+    dataset = RandomWalkClassifier.WalkDataset(train_walks, train_labels, classifier.tokenizer)
 
     return dataset
 
