@@ -89,8 +89,17 @@ def prepare_eval_dataset(classifier, codex, split):
     valid_triples = codex.split(split)
     invalid_triples = codex.negative_split(split)
 
-    valid_walks = valid_triples.values.tolist()
-    invalid_walks = invalid_triples.values.tolist()
+    def transform_triples(triples):
+        transformed = []
+        for head, relation, tail in triples.values:
+            head_label = codex.entity_label(head)
+            relation_label = codex.relation_label(relation)
+            tail_label = codex.entity_label(tail)
+            transformed.append([head_label, relation_label, tail_label])
+        return transformed
+
+    valid_walks = transform_triples(valid_triples)
+    invalid_walks = transform_triples(invalid_triples)
 
     print(f"\n{split.capitalize()} Valid Walks:")
     for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
@@ -100,17 +109,9 @@ def prepare_eval_dataset(classifier, codex, split):
     for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
         print(f"Walk {i + 1}: {walk}")
 
-    encoded_valid_walks = classifier.encode_walks(valid_walks)
-    encoded_invalid_walks = classifier.encode_walks(invalid_walks)
-
-    valid_labels = [1] * len(encoded_valid_walks)
-    invalid_labels = [0] * len(encoded_invalid_walks)
-
-    walks = encoded_valid_walks + encoded_invalid_walks
-    labels = valid_labels + invalid_labels
+    walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
 
     dataset = RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
-
     return dataset
 
 
