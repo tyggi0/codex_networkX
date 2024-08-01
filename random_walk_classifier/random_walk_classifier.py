@@ -67,20 +67,46 @@ class RandomWalkClassifier:
             }
 
 
-def prepare_train_dataset(generator, classifier, num_walks, walk_length=6):
+def prepare_train_dataset(generator, classifier, codex, num_walks, walk_length=6):
+    # Generate random walks
     valid_walks = generator.generate_random_walks(num_walks, walk_length)
     invalid_walks = generator.generate_invalid_random_walks(valid_walks)
 
-    print("Valid Walks:")
+    print("Random Walks for Training:")
     for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
-        print(f"Walk {i + 1}: {walk}")
-
-    print("\nInvalid Walks:")
+        print(f"Valid Walk {i + 1}: {walk}")
     for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
-        print(f"Walk {i + 1}: {walk}")
+        print(f"Invalid Walk {i + 1}: {walk}")
 
     walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
-    dataset = RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
+
+    # Add triples from the train split
+    train_triples = codex.split("train")
+
+    def transform_triples(triples):
+        transformed = []
+        for head, relation, tail in triples.values:
+            head_label = codex.entity_label(head)
+            relation_label = codex.relation_label(relation)
+            tail_label = codex.entity_label(tail)
+            transformed.append([head_label, relation_label, tail_label])
+        return transformed
+
+    train_valid_walks = transform_triples(train_triples)
+    train_invalid_walks = generator.generate_invalid_random_walks(train_valid_walks)
+
+    print("\nTriples from Train Split:")
+    for i, walk in enumerate(train_valid_walks[:10]):  # Print first 10 valid walks
+        print(f"Train Valid Walk {i + 1}: {walk}")
+    for i, walk in enumerate(train_invalid_walks[:10]):  # Print first 10 invalid walks
+        print(f"Train Invalid Walk {i + 1}: {walk}")
+
+    train_walks, train_labels = classifier.prepare_data(train_valid_walks, train_invalid_walks)
+
+    combined_walks = walks + train_walks
+    combined_labels = labels + train_labels
+
+    dataset = RandomWalkClassifier.WalkDataset(combined_walks, combined_labels, classifier.tokenizer)
 
     return dataset
 
