@@ -2,12 +2,10 @@ import torch
 from transformers import BertTokenizer, BertForSequenceClassification, TrainingArguments, Trainer
 from torch.utils.data import Dataset, random_split
 from codex.codex import Codex
-from graph_handler import GraphHandler
+from graph import Graph
 from random_walk_generator import RandomWalkGenerator
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import accuracy_score
-
-num_walks = 4000
 
 
 class RandomWalkClassifier:
@@ -69,7 +67,7 @@ class RandomWalkClassifier:
             }
 
 
-def prepare_datasets(generator, classifier, num_walks, walk_length=6):
+def prepare_train_dataset(generator, classifier, num_walks, walk_length=6):
     valid_walks = generator.generate_random_walks(num_walks, walk_length)
     invalid_walks = generator.generate_invalid_random_walks(valid_walks)
 
@@ -84,23 +82,47 @@ def prepare_datasets(generator, classifier, num_walks, walk_length=6):
     walks, labels = classifier.prepare_data(valid_walks, invalid_walks)
     dataset = RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
 
-    train_size = int(0.8 * len(dataset))
-    valid_size = int(0.1 * len(dataset))
-    test_size = len(dataset) - train_size - valid_size
+    return dataset
 
-    train_dataset, valid_dataset, test_dataset = random_split(dataset, [train_size, valid_size, test_size])
 
-    # print("\nFirst 10 walks in the training dataset:")
-    # for i in range(10):
-    #     print(train_dataset[i])
-    #
-    # print("\nFirst 10 walks in the validation dataset:")
-    # for i in range(10):
-    #     print(valid_dataset[i])
-    #
-    # print("\nFirst 10 walks in the test dataset:")
-    # for i in range(10):
-    #     print(test_dataset[i])
+def prepare_eval_dataset(classifier, codex, split):
+    valid_triples = codex.split(split)
+    invalid_triples = codex.split(f"{split}_negative")
+
+    valid_walks = valid_triples.values.tolist()
+    invalid_walks = invalid_triples.values.tolist()
+
+    print(f"\n{split.capitalize()} Valid Walks:")
+    for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
+        print(f"Walk {i + 1}: {walk}")
+
+    print(f"\n{split.capitalize()} Invalid Walks:")
+    for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
+        print(f"Walk {i + 1}: {walk}")
+
+    encoded_valid_walks = classifier.encode_walks(valid_walks)
+    encoded_invalid_walks = classifier.encode_walks(invalid_walks)
+
+    valid_labels = [1] * len(encoded_valid_walks)
+    invalid_labels = [0] * len(encoded_invalid_walks)
+
+    walks = encoded_valid_walks + encoded_invalid_walks
+    labels = valid_labels + invalid_labels
+
+    dataset = RandomWalkClassifier.WalkDataset(walks, labels, classifier.tokenizer)
+
+    return dataset
+
+
+def prepare_datasets(generator, classifier, codex, num_walks, walk_length=6):
+    # Prepare training dataset from the graph
+    train_dataset = prepare_train_dataset(generator, classifier, num_walks, walk_length)
+
+    # Prepare validation dataset from Codex splits
+    valid_dataset = prepare_eval_dataset(classifier, codex, "valid")
+
+    # Prepare test dataset from Codex splits
+    test_dataset = prepare_eval_dataset(classifier, codex, "test")
 
     return train_dataset, valid_dataset, test_dataset
 
@@ -152,15 +174,14 @@ def tune_hyperparameters(trainer, train_dataset, valid_dataset):
     return best_params
 
 
-def main(random_walk_name, tune):
+def main(random_walk_name, tune, num_walks=4000):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
 
-    # Initialize GraphHandler and load the graph
-    graph_handler = GraphHandler(codex)
-    graph = graph_handler.load_graphs()
+    # Initialize and load the Graph
+    graph = Graph(codex).load_graph()
 
     # Initialize classifier
     classifier = RandomWalkClassifier(device=device)
@@ -170,7 +191,7 @@ def main(random_walk_name, tune):
 
     # Prepare datasets
     print("Preparing datasets...")
-    train_dataset, valid_dataset, test_dataset = prepare_datasets(generator, classifier, num_walks=num_walks)
+    train_dataset, valid_dataset, test_dataset = prepare_datasets(generator, classifier, codex, num_walks=num_walks)
 
     # Set up the training arguments
     training_args = TrainingArguments(
