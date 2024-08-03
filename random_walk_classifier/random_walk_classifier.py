@@ -31,7 +31,7 @@ class RandomWalkClassifier:
         return predictions
 
 
-def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size):
+def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Initialize Codex
@@ -51,7 +51,8 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size):
                                                   .prepare_datasets(random_walk_name, alpha, num_walks, walk_length))
 
     # Create output directory based on hyperparameters
-    output_dir = f"./results/{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}"
+    output_dir = os.path.join(parent_output_dir,
+                              f"{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}")
     os.makedirs(output_dir, exist_ok=True)
 
     # Train and Evaluate Model
@@ -68,9 +69,12 @@ if __name__ == "__main__":
     parser.add_argument('--num_walks', type=int, default=4000, help='Number of walks to generate')
     parser.add_argument('--walk_length', type=int, default=6, help='Length of each walk')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loading')
+    parser.add_argument('--output_dir', type=str, required=True, help='Directory to save the results')
     args = parser.parse_args()
 
-    main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.batch_size)
+    main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.batch_size, args.output_dir)
     # Running script:
-    # python random_walk_classifier/random_walk_classifier.py --random_walk Traditional --tune --alpha 0.6 --num_walks 5000 --walk_length 8 --batch_size 16
+    # python random_walk_classifier/random_walk_classifier.py
+    #       --random_walk Traditional --tune --alpha 0.6 --num_walks 5000 --walk_length 8 --batch_size 16
+    #       --parent_output_dir /content/drive/MyDrive/codex_random_walk
 
