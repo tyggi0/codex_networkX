@@ -51,7 +51,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size):
                                                   .prepare_datasets(random_walk_name, alpha, num_walks, walk_length))
 
     # Create output directory based on hyperparameters
-    output_dir = f"./results/{random_walk_name}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}"
+    output_dir = f"./results/{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}"
     os.makedirs(output_dir, exist_ok=True)
 
     # Train and Evaluate Model
