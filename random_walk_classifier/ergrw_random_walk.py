@@ -3,63 +3,42 @@ import random
 
 
 class ERGRWRandomWalk:
-    def __init__(self, graph: nx.Graph, alpha=0.5):
+    def __init__(self, graph: nx.Graph, alpha):
         self.G = graph
         self.alpha = alpha
 
-    def rule1_walk(self, current, neighbors):
+    def random_walk_rule1(self, start_node, walk_length):
         """ Perform a Rule1 (entity-to-entity) walk step. """
-        if neighbors:
-            return random.choice(neighbors)
-        return None
-
-    def rule2_walk(self, current, neighbors):
-        """ Perform a Rule2 (entity-relation) walk step. """
-        if neighbors:
-            next_node = random.choice(neighbors)
-            relation = self.G[current][next_node]['relation']
-            return relation, next_node
-        return None, None
-
-    def generate_walk(self, start_node, walk_length):
-        """ Generate a single walk from a given start node. """
-        # print(f"Starting walk from: {start_node}")
-        walk = [start_node]
-        current = start_node
-        step = 0
-
-        while step < walk_length - 1:
-            neighbors = list(self.G.neighbors(current))
+        sequence = [start_node]
+        current_node = start_node
+        for _ in range(walk_length - 1):
+            neighbors = list(self.G.neighbors(current_node))
             if not neighbors:
-                # print(f"No neighbors found for {current}. Ending walk early.")
                 break
+            next_node = random.choice(neighbors)
+            sequence.append(next_node)
+            current_node = next_node
+        return sequence
 
-            if random.random() < self.alpha:
-                # Apply Rule1 (entity-to-entity)
-                next_node = self.rule1_walk(current, neighbors)
-                if next_node:
-                    # print(f"Rule1: Moving from {current} to {next_node}")
-                    walk.append(next_node)
-                    current = next_node
-                    step += 1
-                else:
-                    # print(f"Rule1: No valid moves from {current}, retrying...")
-                    continue  # If no valid move, attempt another step
-            else:
-                # Apply Rule2 (entity-relation)
-                relation, next_node = self.rule2_walk(current, neighbors)
-                if next_node:
-                    # print(f"Rule2: Moving from {current} via {relation} to {next_node}")
-                    walk.append(relation)
-                    walk.append(next_node)
-                    current = next_node
-                    step += 2
-                else:
-                    # print(f"Rule2: No valid moves from {current}, retrying...")
-                    continue  # If no valid move, attempt another step
+    def random_walk_rule2(self, start_node, walk_length):
+        """ Perform a Rule2 (entity-relation) walk step. """
+        sequence = [start_node]
+        current_node = start_node
+        for _ in range(walk_length // 2):
+            relation_neighbors = list(self.G[current_node].keys())  # Get relation types (edge labels)
+            if not relation_neighbors:
+                break
+            next_relation = random.choice(relation_neighbors)
+            sequence.append(next_relation)
 
-        # print(f"Completed walk: {walk}")
-        return walk
+            entity_neighbors = list(self.G[current_node][next_relation])
+            if not entity_neighbors:
+                break
+            next_node = random.choice(entity_neighbors)
+            sequence.append(next_node)
+
+            current_node = next_node
+        return sequence
 
     def generate_walks(self, num_walks, walk_length, min_walk_length=3):
         """ Generate a specified number of random walks of a given length. """
@@ -67,8 +46,13 @@ class ERGRWRandomWalk:
         nodes = list(self.G.nodes)
         while len(walks) < num_walks:
             start_node = random.choice(nodes)
-            # print(f"Generating walk {i + 1}/{num_walks} from {start_node}")
-            walk = self.generate_walk(start_node, walk_length)
+            if random.random() < self.alpha:
+                walk = self.random_walk_rule1(start_node, walk_length)
+            else:
+                walk = self.random_walk_rule2(start_node, walk_length)
+
+            # Ensure each walk generated has the minimum walk length
             if len(walk) >= min_walk_length:
                 walks.append(walk)
+
         return walks

@@ -1,18 +1,18 @@
 import random
-from brownian_motion_random_walk import BrownianMotionRandomWalk
+from traditional_random_walk import TraditionalRandomWalk
 from ergrw_random_walk import ERGRWRandomWalk
 
 
 class RandomWalkGenerator:
-    def __init__(self, graph, random_walk_strategy):
+    def __init__(self, graph, random_walk_strategy, alpha):
         self.graph = graph
-        self.random_walk = self.get_random_walk_strategy(random_walk_strategy)
+        self.random_walk = self.get_random_walk_strategy(random_walk_strategy, alpha)
 
-    def get_random_walk_strategy(self, name):
-        if name == "BrownianMotion":
-            return BrownianMotionRandomWalk(self.graph)
+    def get_random_walk_strategy(self, name, alpha):
+        if name == "Traditional":
+            return TraditionalRandomWalk(self.graph)
         elif name == "ERGRW":
-            return ERGRWRandomWalk(self.graph)
+            return ERGRWRandomWalk(self.graph, alpha)
         else:
             raise ValueError(f"Unknown random walk strategy: {name}")
 

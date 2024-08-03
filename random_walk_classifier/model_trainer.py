@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import TrainingArguments, Trainer
 from sklearn.model_selection import ParameterGrid
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report
 
 from walk_dataset import WalkDataset
 
@@ -40,9 +40,9 @@ class ModelTrainer:
         # Prepare data loaders from datasets
         train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True,
                                   collate_fn=WalkDataset.collate_fn)
-        valid_loader = DataLoader(self.valid_dataset, batch_size=batch_size, shuffle=True,
+        valid_loader = DataLoader(self.valid_dataset, batch_size=batch_size, shuffle=False,
                                   collate_fn=WalkDataset.collate_fn)
-        test_loader = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=True,
+        test_loader = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False,
                                  collate_fn=WalkDataset.collate_fn)
         return train_loader, valid_loader, test_loader
 
@@ -124,9 +124,24 @@ class ModelTrainer:
         print("Training the model...")
         trainer.train()
 
-        # Evaluate the model on test data
-        print("Evaluating the model on test dataset...")
-        test_results = trainer.evaluate(eval_dataset=test_loader.dataset)
-        print(f"Test dataset evaluation results: {test_results}")
+        # Perform evaluation on test data
+        test_results = self.evaluate(test_loader)
+        print(f"Evaluation results on test dataset: {test_results}")
 
         return test_results
+
+    def evaluate(self, data_loader):
+        self.classifier.model.eval()
+        all_logits = []
+        all_labels = []
+
+        with torch.no_grad():
+            for batch in data_loader:
+                input_ids = batch['input_ids'].to(self.device)
+                attention_mask = batch['attention_mask'].to(self.device)
+                labels = batch['label'].to(self.device)
+                outputs = self.classifier.model(input_ids=input_ids, attention_mask=attention_mask)
+                _, preds = torch.max(outputs, dim=1)
+                all_logits.extend(preds.cpu().tolist())
+                all_labels.extend(labels.cpu().tolist())
+        return accuracy_score(all_labels, all_logits), classification_report(all_labels, all_logits)
