@@ -53,6 +53,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, pare
     # Create output directory based on hyperparameters
     output_dir = os.path.join(parent_output_dir,
                               f"{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}")
+    print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
 
     # Train and Evaluate Model
