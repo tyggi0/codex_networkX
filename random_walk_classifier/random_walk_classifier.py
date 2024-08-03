@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import torch
 from transformers import BertTokenizer, BertForSequenceClassification
@@ -43,21 +44,25 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size):
     classifier = RandomWalkClassifier(device=device)
 
     # Initialize RandomWalkGenerator
-    generator = RandomWalkGenerator(graph, random_walk_name, alpha)
+    generator = RandomWalkGenerator(graph)
 
     # Prepare datasets
-    train_dataset, valid_dataset, test_dataset = (
-        DataPreparation(generator, classifier, codex, num_walks, walk_length).prepare_datasets())
+    train_dataset, valid_dataset, test_dataset = (DataPreparation(generator, classifier, codex)
+                                                  .prepare_datasets(random_walk_name, alpha, num_walks, walk_length))
+
+    # Create output directory based on hyperparameters
+    output_dir = f"./results/{random_walk_name}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}"
+    os.makedirs(output_dir, exist_ok=True)
 
     # Train and Evaluate Model
-    model_trainer = ModelTrainer(classifier, train_dataset, valid_dataset, test_dataset, device, batch_size, tune=tune)
+    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device, batch_size)
     model_trainer.train()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Random Walk Classifier')
-    parser.add_argument('--random_walk', type=str, required=True,
-                        help='Name of the random walk strategy (Traditional, ERGRW)')
+    parser.add_argument('--random_walk', type=str, default=None,
+                        help='Name of the random walk strategy (Traditional, ERGRW), optional')
     parser.add_argument('--tune', action='store_true', help='Flag to tune hyperparameters')
     parser.add_argument('--alpha', type=float, default=0.5, help='Alpha parameter for the ERGRW random walk generator')
     parser.add_argument('--num_walks', type=int, default=4000, help='Number of walks to generate')

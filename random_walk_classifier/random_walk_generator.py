@@ -4,9 +4,8 @@ from ergrw_random_walk import ERGRWRandomWalk
 
 
 class RandomWalkGenerator:
-    def __init__(self, graph, random_walk_strategy, alpha):
+    def __init__(self, graph):
         self.graph = graph
-        self.random_walk = self.get_random_walk_strategy(random_walk_strategy, alpha)
 
     def get_random_walk_strategy(self, name, alpha):
         if name == "Traditional":
@@ -16,8 +15,9 @@ class RandomWalkGenerator:
         else:
             raise ValueError(f"Unknown random walk strategy: {name}")
 
-    def generate_random_walks(self, num_walks, walk_length):
-        return self.random_walk.generate_walks(num_walks, walk_length)
+    def generate_random_walks(self, random_walk_strategy, alpha, num_walks, walk_length):
+        random_walk = self.get_random_walk_strategy(random_walk_strategy, alpha)
+        return random_walk.generate_walks(num_walks, walk_length)
 
     def generate_invalid_random_walks(self, valid_walks, corruption_prob=0.5):
         nodes = list(self.graph.nodes)
