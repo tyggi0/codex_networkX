@@ -70,7 +70,8 @@ if __name__ == "__main__":
     parser.add_argument('--num_walks', type=int, default=4000, help='Number of walks to generate')
     parser.add_argument('--walk_length', type=int, default=6, help='Length of each walk')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loading')
-    parser.add_argument('--parent_output_dir', type=str, required=True, help='Directory to save the results')
+    parser.add_argument('--parent_output_dir', type=str,
+                        default="/content/drive/MyDrive/codex_random_walk", help='Directory to save the results')
     args = parser.parse_args()
 
     main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.batch_size, args.parent_output_dir)
