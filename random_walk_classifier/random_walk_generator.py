@@ -1,6 +1,7 @@
 import random
 from traditional_random_walk import TraditionalRandomWalk
 from ergrw_random_walk import ERGRWRandomWalk
+from ergrw_adapted_random_walk import ERGRWAdaptedRandomWalk
 
 
 class RandomWalkGenerator:
@@ -10,8 +11,10 @@ class RandomWalkGenerator:
     def get_random_walk_strategy(self, name, alpha):
         if name == "Traditional":
             return TraditionalRandomWalk(self.graph)
-        elif name == "ERGRW":
+        elif name == "ERGRW_Adapted":
             return ERGRWRandomWalk(self.graph, alpha)
+        elif name == "ERGRW":
+            return ERGRWAdaptedRandomWalk(self.graph, alpha)
         else:
             raise ValueError(f"Unknown random walk strategy: {name}")
 

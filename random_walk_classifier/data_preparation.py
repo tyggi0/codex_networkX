@@ -44,6 +44,12 @@ class DataPreparation:
         train_valid_walks = self.transform_triples(train_triples)
         train_invalid_walks = self.generator.generate_invalid_random_walks(train_valid_walks)
 
+        print(f"\nTrain Walks:")
+        for i, walk in enumerate(train_valid_walks[:10]):  # Print first 10 valid walks
+            print(f"Valid Walk {i + 1}: {walk}")
+        for i, walk in enumerate(train_invalid_walks[:10]):  # Print first 10 invalid walks
+            print(f"Invalid Walk {i + 1}: {walk}")
+
         train_walks, train_labels = self.encode_data(train_valid_walks, train_invalid_walks)
 
         if random_walk_strategy:
@@ -51,7 +57,7 @@ class DataPreparation:
             valid_walks = self.generator.generate_random_walks(random_walk_strategy, alpha, num_walks, walk_length)
             invalid_walks = self.generator.generate_invalid_random_walks(valid_walks)
 
-            print("Random Walks for Training:")
+            print("\nTrain **Random** Walks:")
             for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
                 print(f"Valid Walk {i + 1}: {walk}")
             for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
@@ -77,13 +83,13 @@ class DataPreparation:
         valid_walks = self.transform_triples(valid_triples)
         invalid_walks = self.transform_triples(invalid_triples)
 
-        print(f"\n{split.capitalize()} Valid Walks:")
+        print(f"\n{split.capitalize()} Walks:")
         for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
-            print(f"Walk {i + 1}: {walk}")
+            print(f"Valid Walk {i + 1}: {walk}")
 
-        print(f"\n{split.capitalize()} Invalid Walks:")
+        print(f"\n{split.capitalize()} Walks:")
         for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
-            print(f"Walk {i + 1}: {walk}")
+            print(f"Invalid Walk {i + 1}: {walk}")
 
         walks, labels = self.encode_data(valid_walks, invalid_walks)
 
