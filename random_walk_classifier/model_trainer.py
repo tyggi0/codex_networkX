@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from transformers import TrainingArguments, Trainer
@@ -24,12 +25,18 @@ class ModelTrainer:
     @staticmethod
     def compute_metrics(eval_pred):
         logits, labels = eval_pred
+        if isinstance(logits, np.ndarray):
+            logits = torch.tensor(logits)
+        if isinstance(labels, np.ndarray):
+            labels = torch.tensor(labels)
+
         predictions = torch.argmax(logits, dim=-1)
 
-        accuracy = accuracy_score(labels, predictions.numpy())
-        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions.numpy(), average='binary')
+        accuracy = accuracy_score(labels.numpy(), predictions.numpy())
+        precision, recall, f1, _ = precision_recall_fscore_support(labels.numpy(), predictions.numpy(),
+                                                                   average='binary')
         probabilities = torch.softmax(logits, dim=-1)[:, 1].numpy()  # ROC needs probabilities
-        roc_auc = roc_auc_score(labels, probabilities)
+        roc_auc = roc_auc_score(labels.numpy(), probabilities)
 
         return {
             "accuracy": accuracy,
@@ -38,6 +45,17 @@ class ModelTrainer:
             "f1": f1,
             "roc_auc": roc_auc
         }
+
+    def get_trainer(self, args, train_dataset, eval_dataset):
+        return Trainer(
+            model=self.classifier.model,
+            args=args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=self.classifier.tokenizer,
+            data_collator=WalkDataset.collate_fn,
+            compute_metrics=self.compute_metrics
+        )
 
     def get_trainer(self, args, train_dataset, eval_dataset):
         return Trainer(
