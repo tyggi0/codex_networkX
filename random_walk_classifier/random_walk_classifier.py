@@ -77,7 +77,7 @@ if __name__ == "__main__":
                         help='Name of the random walk strategy (Traditional, ERGRW, ERGRW_Adapted), optional')
     parser.add_argument('--tune', action='store_true', help='Flag to tune hyperparameters')
     parser.add_argument('--alpha', type=float, default=0.5, help='Alpha parameter for the ERGRW random walk generator')
-    parser.add_argument('--num_walks', type=int, default=4000, help='Number of walks to generate')
+    parser.add_argument('--num_walks', type=int, default=4000, help='Number of valid walks to generate')
     parser.add_argument('--walk_length', type=int, default=6, help='Length of each walk')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loading')
     parser.add_argument('--parent_output_dir', type=str,
