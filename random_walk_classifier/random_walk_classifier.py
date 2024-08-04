@@ -36,10 +36,19 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, pare
 
     # Create output directory based on hyperparameters
     tune_str = "tune_" if tune else ""
-    output_dir = os.path.join(parent_output_dir,
-                              f"{tune_str}{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}")
+
+    # Check if random_walk_name is not "Traditional" to include alpha in the output directory
+    if random_walk_name.lower() != "traditional":
+        output_dir = os.path.join(parent_output_dir,
+                                  f"{tune_str}{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}")
+    else:
+        output_dir = os.path.join(parent_output_dir,
+                                  f"{tune_str}{random_walk_name.lower()}_walks{num_walks}_length{walk_length}_batch{batch_size}")
+
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
+
+
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
