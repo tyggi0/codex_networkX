@@ -35,8 +35,9 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, pare
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create output directory based on hyperparameters
+    tune_str = "tune_" if tune else ""
     output_dir = os.path.join(parent_output_dir,
-                              f"{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}")
+                              f"{tune_str}{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}")
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
 

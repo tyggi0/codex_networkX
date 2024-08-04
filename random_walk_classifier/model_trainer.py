@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import TrainingArguments, Trainer
 from sklearn.model_selection import ParameterGrid
-from sklearn.metrics import accuracy_score, classification_report, precision_recall_fscore_support, roc_auc_score
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 
 from walk_dataset import WalkDataset
 
@@ -25,37 +25,24 @@ class ModelTrainer:
     @staticmethod
     def compute_metrics(eval_pred):
         logits, labels = eval_pred
-        if isinstance(logits, np.ndarray):
-            logits = torch.tensor(logits)
-        if isinstance(labels, np.ndarray):
-            labels = torch.tensor(labels)
+        if isinstance(logits, torch.Tensor):
+            logits = logits.detach().cpu().numpy()
+        if isinstance(labels, torch.Tensor):
+            labels = labels.detach().cpu().numpy()
 
-        predictions = torch.argmax(logits, dim=-1)
+        predictions = np.argmax(logits, axis=-1)
+        eval_accuracy = accuracy_score(labels, predictions)
+        probabilities = torch.softmax(torch.tensor(logits), dim=-1).numpy()[:, 1]
+        roc_auc = roc_auc_score(labels, probabilities)
 
-        accuracy = accuracy_score(labels.numpy(), predictions.numpy())
-        precision, recall, f1, _ = precision_recall_fscore_support(labels.numpy(), predictions.numpy(),
-                                                                   average='binary')
-        probabilities = torch.softmax(logits, dim=-1)[:, 1].numpy()  # ROC needs probabilities
-        roc_auc = roc_auc_score(labels.numpy(), probabilities)
+        # Generate the classification report
+        class_report = classification_report(labels, predictions, output_dict=True)
 
         return {
-            "accuracy": accuracy,
-            "precision": precision,
-            "recall": recall,
-            "f1": f1,
-            "roc_auc": roc_auc
+            "eval_accuracy": eval_accuracy,
+            "roc_auc": roc_auc,
+            "classification_report": class_report
         }
-
-    def get_trainer(self, args, train_dataset, eval_dataset):
-        return Trainer(
-            model=self.classifier.model,
-            args=args,
-            train_dataset=train_dataset,
-            eval_dataset=eval_dataset,
-            tokenizer=self.classifier.tokenizer,
-            data_collator=WalkDataset.collate_fn,
-            compute_metrics=self.compute_metrics
-        )
 
     def get_trainer(self, args, train_dataset, eval_dataset):
         return Trainer(
@@ -130,6 +117,9 @@ class ModelTrainer:
             print("Tuning hyperparameters...")
             self.tune_hyperparameters()
             batch_size = self.best_params['per_device_train_batch_size']
+            total_steps = len(self.train_dataset) // batch_size * self.best_params['num_train_epochs']
+            warmup_steps = int(0.1 * total_steps)  # 10% of the total steps
+
             training_args = TrainingArguments(
                 output_dir=f"{self.output_dir}/training",
                 evaluation_strategy='epoch',  # Evaluate at the end of each epoch
@@ -140,10 +130,15 @@ class ModelTrainer:
                 num_train_epochs=self.best_params['num_train_epochs'],
                 weight_decay=0.01,
                 logging_dir=f'{self.output_dir}/training/logs',
-                logging_strategy="epoch"
+                logging_strategy="epoch",
+                warmup_steps=warmup_steps
             )
         else:
+            num_train_epochs = 5  # was 3
             batch_size = self.batch_size
+            total_steps = len(self.train_dataset) // batch_size * num_train_epochs
+            warmup_steps = int(0.1 * total_steps)  # 10% of the total steps
+
             training_args = TrainingArguments(
                 output_dir=f"{self.output_dir}/training",
                 evaluation_strategy="epoch",
@@ -151,11 +146,11 @@ class ModelTrainer:
                 learning_rate=2e-5,  # Got 0.5 accurary with 1e-4
                 per_device_train_batch_size=batch_size,
                 per_device_eval_batch_size=batch_size,
-                num_train_epochs=5,  # was 3
+                num_train_epochs=num_train_epochs,
                 weight_decay=0.01,
                 logging_dir=f'{self.output_dir}/training/logs',
                 logging_strategy="epoch",
-                # warmup_steps=500,  # Adding warmup steps
+                warmup_steps=warmup_steps,
             )
 
         train_loader, valid_loader, test_loader = self.create_data_loaders(batch_size)
