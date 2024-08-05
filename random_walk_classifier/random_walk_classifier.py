@@ -35,7 +35,7 @@ def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, bat
     tune_str = "tune_" if tune else ""
     batch_str = f"_batch{batch_size}" if not tune else ""
     alpha_str = f"_alpha{alpha}" if random_walk_name and random_walk_name != "traditional" else ""
-    random_walk_name_str = f"{random_walk_name}" if random_walk_name else ""
+    random_walk_name_str = f"{random_walk_name}" if random_walk_name else "codex"
 
     output_dir = os.path.join(parent_output_dir,
                               f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}{batch_str}")
