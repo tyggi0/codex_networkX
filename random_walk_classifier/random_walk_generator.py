@@ -9,11 +9,11 @@ class RandomWalkGenerator:
         self.graph = graph
 
     def get_random_walk_strategy(self, name, alpha):
-        if name == "Traditional":
+        if name == "traditional":
             return TraditionalRandomWalk(self.graph)
-        elif name == "ERGRW":
+        elif name == "ergrw":
             return ERGRWRandomWalk(self.graph, alpha)
-        elif name == "ERGRW_Adapted":
+        elif name == "ergrw_adapted":
             return ERGRWAdaptedRandomWalk(self.graph, alpha)
         else:
             raise ValueError(f"Unknown random walk strategy: {name}")

@@ -31,24 +31,24 @@ class RandomWalkClassifier:
         return predictions
 
 
-def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Create output directory based on hyperparameters
+def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
     tune_str = "tune_" if tune else ""
+    batch_str = f"_batch{batch_size}" if not tune else ""
+    alpha_str = f"_alpha{alpha}" if random_walk_name and random_walk_name.lower() != "traditional" else ""
+    random_walk_name_str = f"{random_walk_name.lower()}" if random_walk_name else ""
 
-    # Check if random_walk_name is not "Traditional" to include alpha in the output directory
-    if random_walk_name.lower() != "traditional":
-        output_dir = os.path.join(parent_output_dir,
-                                  f"{tune_str}{random_walk_name.lower()}_alpha{alpha}_walks{num_walks}_length{walk_length}_batch{batch_size}")
-    else:
-        output_dir = os.path.join(parent_output_dir,
-                                  f"{tune_str}{random_walk_name.lower()}_walks{num_walks}_length{walk_length}_batch{batch_size}")
+    output_dir = os.path.join(parent_output_dir,
+                              f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}{batch_str}")
 
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
 
 
+def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Create output directory based on hyperparameters
+    create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir)
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
@@ -67,7 +67,8 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, pare
                                                   .prepare_datasets(random_walk_name, alpha, num_walks, walk_length))
 
     # Train and Evaluate Model
-    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device, batch_size)
+    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device,
+                                 batch_size)
     model_trainer.train()
 
 
@@ -84,9 +85,9 @@ if __name__ == "__main__":
                         default="/content/drive/MyDrive/codex_random_walk", help='Directory to save the results')
     args = parser.parse_args()
 
-    main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.batch_size, args.parent_output_dir)
+    main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.batch_size,
+         args.parent_output_dir)
     # Running script:
     # python random_walk_classifier/random_walk_classifier.py
     #       --random_walk Traditional --tune --alpha 0.6 --num_walks 5000 --walk_length 8 --batch_size 16
     #       --parent_output_dir /content/drive/MyDrive/codex_random_walk
-
