@@ -117,8 +117,8 @@ class ModelTrainer:
             print("Tuning hyperparameters...")
             self.tune_hyperparameters()
             batch_size = self.best_params['per_device_train_batch_size']
-            total_steps = len(self.train_dataset) // batch_size * self.best_params['num_train_epochs']
-            warmup_steps = int(0.1 * total_steps)  # 10% of the total steps
+            # total_steps = len(self.train_dataset) // batch_size * self.best_params['num_train_epochs']
+            # warmup_steps = int(0.1 * total_steps)  # 10% of the total steps
 
             training_args = TrainingArguments(
                 output_dir=f"{self.output_dir}/training",
@@ -131,13 +131,13 @@ class ModelTrainer:
                 weight_decay=0.01,
                 logging_dir=f'{self.output_dir}/training/logs',
                 logging_strategy="epoch",
-                warmup_steps=warmup_steps
+                # warmup_steps=warmup_steps
             )
         else:
-            num_train_epochs = 5  # was 3
+            num_train_epochs = 3
             batch_size = self.batch_size
-            total_steps = len(self.train_dataset) // batch_size * num_train_epochs
-            warmup_steps = int(0.1 * total_steps)  # 10% of the total steps
+            # total_steps = len(self.train_dataset) // batch_size * num_train_epochs
+            # warmup_steps = int(0.1 * total_steps)  # 10% of the total steps
 
             training_args = TrainingArguments(
                 output_dir=f"{self.output_dir}/training",
@@ -150,7 +150,7 @@ class ModelTrainer:
                 weight_decay=0.01,
                 logging_dir=f'{self.output_dir}/training/logs',
                 logging_strategy="epoch",
-                warmup_steps=warmup_steps,
+                # warmup_steps=warmup_steps,
             )
 
         train_loader, valid_loader, test_loader = self.create_data_loaders(batch_size)
