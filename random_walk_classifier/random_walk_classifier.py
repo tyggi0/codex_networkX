@@ -34,21 +34,24 @@ class RandomWalkClassifier:
 def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
     tune_str = "tune_" if tune else ""
     batch_str = f"_batch{batch_size}" if not tune else ""
-    alpha_str = f"_alpha{alpha}" if random_walk_name and random_walk_name.lower() != "traditional" else ""
-    random_walk_name_str = f"{random_walk_name.lower()}" if random_walk_name else ""
+    alpha_str = f"_alpha{alpha}" if random_walk_name and random_walk_name != "traditional" else ""
+    random_walk_name_str = f"{random_walk_name}" if random_walk_name else ""
 
     output_dir = os.path.join(parent_output_dir,
                               f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}{batch_str}")
 
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
+    return output_dir
 
 
 def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
+    random_walk_name = random_walk_name.lower() if random_walk_name else ""
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create output directory based on hyperparameters
-    create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir)
+    output_dir = create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir)
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
