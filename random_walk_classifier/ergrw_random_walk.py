@@ -39,19 +39,17 @@ class ERGRWRandomWalk:
                 break
         return walk
 
-    def generate_walks(self, num_walks, walk_length, min_walk_length=3):
-        """ Generate a specified number of random walks of a given length. """
+    def generate_walks(self, nodes, num_walks, walk_length, min_walk_length=3):
+        """ Generate the specified number of random walks for each node. """
         walks = []
-        nodes = list(self.G.nodes)
-        while len(walks) < num_walks:
-            start_node = random.choice(nodes)
-            if random.random() < self.alpha:
-                walk = self.random_walk_rule1(start_node, walk_length)
-            else:
-                walk = self.random_walk_rule2(start_node, walk_length)
+        for node in nodes:
+            for _ in range(num_walks):
+                if random.random() < self.alpha:
+                    walk = self.random_walk_rule1(node, walk_length)
+                else:
+                    walk = self.random_walk_rule2(node, walk_length)
 
-            # Ensure each walk generated has the minimum walk length
-            if len(walk) >= min_walk_length:
-                walks.append(walk)
-
+                # Ensure each walk generated has the minimum walk length
+                if len(walk) >= min_walk_length:
+                    walks.append(walk)
         return walks

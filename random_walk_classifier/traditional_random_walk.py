@@ -21,12 +21,10 @@ class TraditionalRandomWalk:
 
         return walk
 
-    def generate_walks(self, num_walks, walk_length):
+    def generate_walks(self, nodes, num_walks, walk_length):
         walks = []
-        nodes = list(self.G.nodes)
-
-        for _ in range(num_walks):
-            start_node = np.random.choice(nodes)
-            walks.append(self.walk(start_node, walk_length))
-
+        for node in nodes:
+            for _ in range(num_walks):
+                start_node = np.random.choice(nodes)
+                walks.append(self.walk(start_node, walk_length))
         return walks

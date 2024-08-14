@@ -49,14 +49,13 @@ class AdaptedERGRWRandomWalk:
                 continue  # If no valid move, attempt another step
         return walk
 
-    def generate_walks(self, num_walks, walk_length, min_walk_length=3):
+    def generate_walks(self, nodes, num_walks, walk_length, min_walk_length=3):
         """ Generate a specified number of random walks of a given length. """
         walks = []
-        nodes = list(self.G.nodes)
-        while len(walks) < num_walks:
-            start_node = random.choice(nodes)
-            # print(f"Generating walk {i + 1}/{num_walks} from {start_node}")
-            walk = self.generate_walk(start_node, walk_length)
+        for node in nodes:
+            for _ in range(num_walks):
+            walk = self.generate_walk(node, walk_length)
+
             if len(walk) >= min_walk_length:
                 walks.append(walk)
         return walks

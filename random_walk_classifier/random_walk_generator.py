@@ -23,10 +23,11 @@ class RandomWalkGenerator:
         degree_dict = dict(self.graph.degree())
         # Sort nodes by degree in descending order
         sorted_nodes = sorted(degree_dict, key=degree_dict.get, reverse=True)
-        print(sorted_nodes[:10])
+        sorted_nodes = sorted_nodes[:num_walks // 2]
+        print(sorted_nodes)
 
         random_walk = self.get_random_walk_strategy(random_walk_strategy, alpha)
-        return random_walk.generate_walks(num_walks, walk_length)
+        return random_walk.generate_walks(sorted_nodes, 2, walk_length)
 
     def generate_invalid_random_walks(self, walks, corruption_prob=0.5):
         nodes = list(self.graph.nodes)
