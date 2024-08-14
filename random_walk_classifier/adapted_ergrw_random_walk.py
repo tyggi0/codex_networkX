@@ -54,8 +54,8 @@ class AdaptedERGRWRandomWalk:
         walks = []
         for node in nodes:
             for _ in range(num_walks):
-            walk = self.generate_walk(node, walk_length)
+                walk = self.generate_walk(node, walk_length)
 
-            if len(walk) >= min_walk_length:
-                walks.append(walk)
+                if len(walk) >= min_walk_length:
+                    walks.append(walk)
         return walks
