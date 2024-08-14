@@ -1,7 +1,7 @@
 import random
-from traditional_random_walk import TraditionalRandomWalk
-from ergrw_random_walk import ERGRWRandomWalk
-from adapted_ergrw_random_walk import AdaptedERGRWRandomWalk
+from random_walk_classifier.traditional_random_walk import TraditionalRandomWalk
+from random_walk_classifier.ergrw_random_walk import ERGRWRandomWalk
+from random_walk_classifier.adapted_ergrw_random_walk import AdaptedERGRWRandomWalk
 
 
 class RandomWalkGenerator:
@@ -19,6 +19,12 @@ class RandomWalkGenerator:
             raise ValueError(f"Unknown random walk strategy: {name}")
 
     def generate_random_walks(self, random_walk_strategy, alpha, num_walks, walk_length):
+        # Identify high-degree nodes
+        degree_dict = dict(self.graph.degree())
+        # Sort nodes by degree in descending order
+        sorted_nodes = sorted(degree_dict, key=degree_dict.get, reverse=True)
+        print(sorted_nodes[:10])
+
         random_walk = self.get_random_walk_strategy(random_walk_strategy, alpha)
         return random_walk.generate_walks(num_walks, walk_length)
 

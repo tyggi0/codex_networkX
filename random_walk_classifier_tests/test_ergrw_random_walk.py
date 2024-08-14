@@ -1,18 +1,19 @@
 import random
-from random_walk_classifier.ergrw_random_walk import ERGRWRandomWalk
 from random_walk_classifier.graph import create_sample_graph
+from random_walk_classifier.random_walk_generator import RandomWalkGenerator
 
 
 def main():
     random.seed(40)  # For reproducibility
+
     G = create_sample_graph()
     alpha = 0.5  # Probability of choosing rule1 or rule2
-
-    walker = ERGRWRandomWalk(G, alpha)
     num_walks = 5
     walk_length = 5
 
-    walks = walker.generate_walks(num_walks, walk_length)
+    generator = RandomWalkGenerator(G)
+
+    walks = generator.generate_random_walks("ergrw", alpha, num_walks, walk_length)
 
     print("Generated Random Walks:")
     for i, walk in enumerate(walks):
