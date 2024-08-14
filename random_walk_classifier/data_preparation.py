@@ -36,35 +36,41 @@ class DataPreparation:
         print(f"Total encoded invalid walks: {len(encoded_invalid_walks)}")
         print(f"Total combined walks: {len(walks)}")
 
+        # Print first 10 valid and invalid walks
+        for i, walk in enumerate(encoded_valid_walks[:10]):
+            print(f"Valid Walk {i + 1}: {walk}")
+        for i, walk in enumerate(encoded_invalid_walks[:10]):
+            print(f"Invalid Walk {i + 1}: {walk}")
+
         return walks, labels
 
     def prepare_train_dataset(self, random_walk_strategy, alpha, num_walks, walk_length):
-        # Add triples from the train split
+        # Load the Codex train split
         train_triples = self.codex.split("train")
-        train_valid_walks = self.transform_triples(train_triples)
-        train_invalid_walks = self.generator.generate_invalid_random_walks(train_valid_walks)
 
-        print(f"\nTrain Walks:")
-        for i, walk in enumerate(train_valid_walks[:10]):  # Print first 10 valid walks
-            print(f"Valid Walk {i + 1}: {walk}")
-        for i, walk in enumerate(train_invalid_walks[:10]):  # Print first 10 invalid walks
-            print(f"Invalid Walk {i + 1}: {walk}")
+        # Split the train triples into two halves
+        mid_index = len(train_triples) // 2
+        first_half_triples = train_triples.iloc[:mid_index]
+        second_half_triples = train_triples.iloc[mid_index:]
 
+        # Transform the first half into valid walks
+        train_valid_walks = self.transform_triples(first_half_triples)
+
+        # Corrupt the second half to generate invalid walks
+        train_invalid_walks = self.generator.generate_invalid_random_walks(self.transform_triples(second_half_triples))
+
+        print("\nEncoded Train Walks:")
         train_walks, train_labels = self.encode_data(train_valid_walks, train_invalid_walks)
 
         if random_walk_strategy:
-            # Generate random walks
+            # Generate additional random walks if a strategy is provided
             valid_walks = self.generator.generate_random_walks(random_walk_strategy, alpha, num_walks, walk_length)
             invalid_walks = self.generator.generate_invalid_random_walks(valid_walks)
 
-            print("\nTrain **Random** Walks:")
-            for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
-                print(f"Valid Walk {i + 1}: {walk}")
-            for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
-                print(f"Invalid Walk {i + 1}: {walk}")
-
+            print("\nEncoded Train **Random** Walks:")
             walks, labels = self.encode_data(valid_walks, invalid_walks)
 
+            # Combine the walks and labels from the Codex split and random walks
             combined_walks = walks + train_walks
             combined_labels = labels + train_labels
 

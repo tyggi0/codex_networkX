@@ -9,36 +9,35 @@ class ERGRWRandomWalk:
 
     def random_walk_rule1(self, start_node, walk_length):
         """ Perform a Rule1 (entity-to-entity) walk step. """
-        sequence = [start_node]
+        walk = [start_node]
         current_node = start_node
         for _ in range(walk_length - 1):
             neighbors = list(self.G.neighbors(current_node))
             if not neighbors:
                 break
             next_node = random.choice(neighbors)
-            sequence.append(next_node)
+            walk.append("is connected to")
+            walk.append(next_node)
             current_node = next_node
-        return sequence
+        return walk
 
     def random_walk_rule2(self, start_node, walk_length):
         """ Perform a Rule2 (entity-relation) walk step. """
-        sequence = [start_node]
+        walk = [start_node]
         current_node = start_node
         for _ in range(walk_length // 2):
-            relation_neighbors = list(self.G[current_node].keys())  # Get relation types (edge labels)
-            if not relation_neighbors:
+            neighbors = list(self.G[current_node])
+            if not neighbors:
                 break
-            next_relation = random.choice(relation_neighbors)
-            sequence.append(next_relation)
-
-            entity_neighbors = list(self.G[current_node][next_relation])
-            if not entity_neighbors:
+            next_node = random.choice(neighbors)
+            next_relation = self.G[current_node][next_node]['key']
+            if next_relation:
+                walk.append(next_relation)
+                walk.append(next_node)
+                current_node = next_node
+            else:
                 break
-            next_node = random.choice(entity_neighbors)
-            sequence.append(next_node)
-
-            current_node = next_node
-        return sequence
+        return walk
 
     def generate_walks(self, num_walks, walk_length, min_walk_length=3):
         """ Generate a specified number of random walks of a given length. """

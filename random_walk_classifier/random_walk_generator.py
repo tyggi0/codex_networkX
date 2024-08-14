@@ -1,7 +1,7 @@
 import random
 from traditional_random_walk import TraditionalRandomWalk
 from ergrw_random_walk import ERGRWRandomWalk
-from ergrw_adapted_random_walk import ERGRWAdaptedRandomWalk
+from adapted_ergrw_random_walk import AdaptedERGRWRandomWalk
 
 
 class RandomWalkGenerator:
@@ -13,8 +13,8 @@ class RandomWalkGenerator:
             return TraditionalRandomWalk(self.graph)
         elif name == "ergrw":
             return ERGRWRandomWalk(self.graph, alpha)
-        elif name == "ergrw_adapted":
-            return ERGRWAdaptedRandomWalk(self.graph, alpha)
+        elif name == "adapted_ergrw":
+            return AdaptedERGRWRandomWalk(self.graph, alpha)
         else:
             raise ValueError(f"Unknown random walk strategy: {name}")
 
@@ -22,12 +22,12 @@ class RandomWalkGenerator:
         random_walk = self.get_random_walk_strategy(random_walk_strategy, alpha)
         return random_walk.generate_walks(num_walks, walk_length)
 
-    def generate_invalid_random_walks(self, valid_walks, corruption_prob=0.5):
+    def generate_invalid_random_walks(self, walks, corruption_prob=0.5):
         nodes = list(self.graph.nodes)
         edges = list(self.graph.edges(data=True))
         invalid_walks = []
 
-        for walk in valid_walks:
+        for walk in walks:
             invalid_walk = walk.copy()
             for i in range(len(invalid_walk)):
                 if random.random() < corruption_prob:

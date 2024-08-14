@@ -2,26 +2,28 @@ import networkx as nx
 import random
 
 
-class ERGRWAdaptedRandomWalk:
+class AdaptedERGRWRandomWalk:
     def __init__(self, graph: nx.Graph, alpha):
         self.G = graph
         self.alpha = alpha
 
     def rule1_walk(self, neighbors):
-        """ Perform a Rule1 (entity-to-entity) walk step. """
-        return random.choice(neighbors) if neighbors else None
+        """ Perform a Rule1 (entity-to-entity) walk step, including the 'is connected to' relationship. """
+        if neighbors:
+            next_node = random.choice(neighbors)
+            return "is connected to", next_node
+        return None, None
 
     def rule2_walk(self, current, neighbors):
         """ Perform a Rule2 (entity-relation) walk step. """
         if neighbors:
             next_node = random.choice(neighbors)
-            relation = self.G[current][next_node]['relation']
+            relation = self.G[current][next_node].get('key', None)
             return relation, next_node
         return None, None
 
     def generate_walk(self, start_node, walk_length):
         """ Generate a single walk from a given start node. """
-        # print(f"Starting walk from: {start_node}")
         walk = [start_node]
         current = start_node
         step = 0
@@ -33,25 +35,18 @@ class ERGRWAdaptedRandomWalk:
 
             if random.random() < self.alpha:
                 # Apply Rule1 (entity-to-entity)
-                next_node = self.rule1_walk(neighbors)
-                if next_node:
-                    walk.append(next_node)
-                    current = next_node
-                    step += 1
-                else:
-                    continue  # If no valid move, attempt another step
+                relation, next_node = self.rule1_walk(neighbors)
             else:
                 # Apply Rule2 (entity-relation)
                 relation, next_node = self.rule2_walk(current, neighbors)
-                if next_node:
-                    # print(f"Rule2: Moving from {current} via {relation} to {next_node}")
-                    walk.append(relation)
-                    walk.append(next_node)
-                    current = next_node
-                    step += 2
-                else:
-                    continue  # If no valid move, attempt another step
 
+            if next_node:
+                walk.append(relation)
+                walk.append(next_node)
+                current = next_node
+                step += 2
+            else:
+                continue  # If no valid move, attempt another step
         return walk
 
     def generate_walks(self, num_walks, walk_length, min_walk_length=3):
