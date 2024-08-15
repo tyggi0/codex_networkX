@@ -25,7 +25,7 @@ class ERGRWRandomWalk:
         """ Perform a Rule2 (entity-relation) walk step. """
         walk = [start_node]
         current_node = start_node
-        for _ in range(walk_length // 2):
+        for _ in range(walk_length - 1):
             neighbors = list(self.G[current_node])
             if not neighbors:
                 break

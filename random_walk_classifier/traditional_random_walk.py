@@ -25,6 +25,5 @@ class TraditionalRandomWalk:
         walks = []
         for node in nodes:
             for _ in range(num_walks):
-                start_node = np.random.choice(nodes)
-                walks.append(self.walk(start_node, walk_length))
+                walks.append(self.walk(node, walk_length))
         return walks

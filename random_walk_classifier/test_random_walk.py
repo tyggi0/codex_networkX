@@ -1,6 +1,6 @@
 import random
-from random_walk_classifier.graph import create_sample_graph
-from random_walk_classifier.random_walk_generator import RandomWalkGenerator
+from graph import create_sample_graph
+from random_walk_generator import RandomWalkGenerator
 
 random.seed(34)  # For reproducibility
 

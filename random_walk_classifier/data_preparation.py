@@ -1,5 +1,3 @@
-from torch.utils.data import DataLoader
-
 from walk_dataset import WalkDataset
 
 

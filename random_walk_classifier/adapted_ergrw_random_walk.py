@@ -44,7 +44,7 @@ class AdaptedERGRWRandomWalk:
                 walk.append(relation)
                 walk.append(next_node)
                 current = next_node
-                step += 2
+                step += 1
             else:
                 continue  # If no valid move, attempt another step
         return walk
