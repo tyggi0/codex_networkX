@@ -42,7 +42,7 @@ class RandomWalkGenerator:
                         invalid_walk[i] = random.choice(nodes)
                     else:  # Change relation
                         random_edge = random.choice(edges)
-                        invalid_walk[i] = random_edge[2]['relation']
+                        invalid_walk[i] = random_edge[2]['key']
             invalid_walks.append(invalid_walk)
 
         return invalid_walks
