@@ -1,9 +1,11 @@
 import json
+import random
 
 import numpy as np
 import torch
+from torch.optim import SGD
 from torch.utils.data import DataLoader
-from transformers import TrainingArguments, Trainer
+from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 
@@ -11,7 +13,7 @@ from walk_dataset import WalkDataset
 
 
 class ModelTrainer:
-    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device, batch_size):
+    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device):
         self.output_dir = output_dir
         self.tune = tune
         self.classifier = classifier
@@ -19,7 +21,6 @@ class ModelTrainer:
         self.valid_dataset = valid_dataset
         self.test_dataset = test_dataset
         self.device = device
-        self.batch_size = batch_size
         self.best_params = None
 
     @staticmethod
@@ -44,6 +45,9 @@ class ModelTrainer:
             "classification_report": class_report
         }
 
+    def get_optimizer(self):
+        return SGD(self.classifier.model.parameters(), lr=self.best_params['learning_rate'])
+
     def get_trainer(self, args, train_dataset, eval_dataset):
         return Trainer(
             model=self.classifier.model,
@@ -52,7 +56,8 @@ class ModelTrainer:
             eval_dataset=eval_dataset,
             tokenizer=self.classifier.tokenizer,
             data_collator=WalkDataset.collate_fn,
-            compute_metrics=self.compute_metrics
+            compute_metrics=self.compute_metrics,
+            optimizers=(self.get_optimizer(), None)  # Pass SGD as the optimizer
         )
 
     def create_data_loaders(self, batch_size):
@@ -65,30 +70,43 @@ class ModelTrainer:
                                  collate_fn=WalkDataset.collate_fn)
         return train_loader, valid_loader, test_loader
 
-    def tune_hyperparameters(self):
-        param_grid = {
-            'learning_rate': [1e-5, 3e-5, 5e-5],
-            'num_train_epochs': [3, 4, 5],
+    def tune_hyperparameters(self, n_iter=10):
+        param_distributions = {
+            'learning_rate': np.logspace(-5, -4, num=100),  # 1e-5 to 1e-4
+            'num_train_epochs': [3, 5, 7, 9],
             'per_device_train_batch_size': [16, 32],
+            'warmup_ratio': [0.0, 0.1, 0.2]
         }
         best_params = None
         best_score = float('-inf')
 
-        for params in ParameterGrid(param_grid):
-            print(f"Trying parameters: {params}")
+        for _ in range(n_iter):
+            # Randomly sample hyperparameters
+            params = {
+                'learning_rate': random.choice(param_distributions['learning_rate']),
+                'num_train_epochs': random.choice(param_distributions['num_train_epochs']),
+                'per_device_train_batch_size': random.choice(param_distributions['per_device_train_batch_size']),
+                'warmup_ratio': random.choice(param_distributions['warmup_ratio']),
+            }
             batch_size = params['per_device_train_batch_size']
+            total_steps = len(self.train_dataset) // batch_size * params['num_train_epochs']
+            warmup_steps = int(total_steps * params['warmup_ratio'])
+
+            print(f"Trying parameters: {params} with warmup_steps={warmup_steps}")
+
             train_loader, valid_loader, _ = self.create_data_loaders(batch_size)
 
             training_args = TrainingArguments(
                 output_dir=f'{self.output_dir}/fine_tuning',
                 evaluation_strategy='epoch',  # Evaluate at the end of each epoch
                 save_strategy='epoch',  # Save a checkpoint at the end of each epoch
-                # save_total_limit=10,  # Only keep the last 10 checkpoints
+                save_total_limit=10,  # Only keep the last 10 checkpoints
                 learning_rate=params['learning_rate'],
                 per_device_train_batch_size=batch_size,
                 per_device_eval_batch_size=batch_size,
                 num_train_epochs=params['num_train_epochs'],
                 weight_decay=0.01,
+                warmup_steps=warmup_steps,
                 logging_strategy="epoch",  # ELog training data stats for loss
                 logging_dir=f'{self.output_dir}/fine_tuning/logs',
             )
@@ -116,46 +134,42 @@ class ModelTrainer:
         if self.tune:
             print("Tuning hyperparameters...")
             self.tune_hyperparameters()
-            batch_size = self.best_params['per_device_train_batch_size']
-            # total_steps = len(self.train_dataset) // batch_size * self.best_params['num_train_epochs']
-            # warmup_steps = int(0.1 * total_steps)  # 10% of the total steps
-
-            training_args = TrainingArguments(
-                output_dir=f"{self.output_dir}/training",
-                evaluation_strategy='epoch',  # Evaluate at the end of each epoch
-                save_strategy='epoch',  # Save a checkpoint at the end of each epoch
-                learning_rate=self.best_params['learning_rate'],
-                per_device_train_batch_size=batch_size,
-                per_device_eval_batch_size=batch_size,
-                num_train_epochs=self.best_params['num_train_epochs'],
-                weight_decay=0.01,
-                logging_dir=f'{self.output_dir}/training/logs',
-                logging_strategy="epoch",
-                # warmup_steps=warmup_steps
-            )
         else:
-            num_train_epochs = 3
-            batch_size = self.batch_size
-            # total_steps = len(self.train_dataset) // batch_size * num_train_epochs
-            # warmup_steps = int(0.1 * total_steps)  # 10% of the total steps
+            # If not tuning, set default best_params
+            self.best_params = {
+                'learning_rate': 2e-5,
+                'num_train_epochs': 5,
+                'per_device_train_batch_size': 16,
+                'warmup_ratio': 0.1
+            }
 
-            training_args = TrainingArguments(
-                output_dir=f"{self.output_dir}/training",
-                evaluation_strategy="epoch",
-                save_strategy='epoch',  # Save a checkpoint at the end of each epoch
-                learning_rate=2e-5,  # Got 0.5 accurary with 1e-4
-                per_device_train_batch_size=batch_size,
-                per_device_eval_batch_size=batch_size,
-                num_train_epochs=num_train_epochs,
-                weight_decay=0.01,
-                logging_dir=f'{self.output_dir}/training/logs',
-                logging_strategy="epoch",
-                # warmup_steps=warmup_steps,
-            )
+        batch_size = self.best_params['per_device_train_batch_size']
+        total_steps = len(self.train_dataset) // batch_size * self.best_params['num_train_epochs']
+        warmup_steps = int(self.best_params.get('warmup_ratio', 0.1) * total_steps)
+
+        training_args = TrainingArguments(
+            output_dir=f"{self.output_dir}/training",
+            evaluation_strategy='epoch',  # Evaluate at the end of each epoch
+            save_strategy='epoch',  # Save a checkpoint at the end of each epoch
+            learning_rate=self.best_params['learning_rate'],
+            per_device_train_batch_size=batch_size,
+            per_device_eval_batch_size=batch_size,
+            num_train_epochs=self.best_params['num_train_epochs'],
+            weight_decay=0.01,
+            warmup_steps=warmup_steps,
+            logging_dir=f'{self.output_dir}/training/logs',
+            logging_strategy="epoch",
+        )
+
+        # Initialize early stopping callback
+        early_stopping = EarlyStoppingCallback(early_stopping_patience=3)
 
         train_loader, valid_loader, test_loader = self.create_data_loaders(batch_size)
 
         trainer = self.get_trainer(training_args, train_loader.dataset, valid_loader.dataset)
+
+        # Add the early stopping callback
+        trainer.add_callback(early_stopping)
 
         # Train the model
         print("Training the model...")

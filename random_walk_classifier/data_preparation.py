@@ -87,14 +87,7 @@ class DataPreparation:
         valid_walks = self.transform_triples(valid_triples)
         invalid_walks = self.transform_triples(invalid_triples)
 
-        print(f"\n{split.capitalize()} Walks:")
-        for i, walk in enumerate(valid_walks[:10]):  # Print first 10 valid walks
-            print(f"Valid Walk {i + 1}: {walk}")
-
-        print(f"\n{split.capitalize()} Walks:")
-        for i, walk in enumerate(invalid_walks[:10]):  # Print first 10 invalid walks
-            print(f"Invalid Walk {i + 1}: {walk}")
-
+        print(f"\nEncoded {split.capitalize()} Walks:")
         walks, labels = self.encode_data(valid_walks, invalid_walks)
 
         dataset = WalkDataset(walks, labels, self.classifier.tokenizer)

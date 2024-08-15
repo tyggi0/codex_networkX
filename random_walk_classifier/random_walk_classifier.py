@@ -1,5 +1,6 @@
 import argparse
 import os
+import random
 
 import torch
 from transformers import BertTokenizer, BertForSequenceClassification
@@ -46,6 +47,8 @@ def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, bat
 
 
 def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
+    random.seed(34)
+
     random_walk_name = random_walk_name.lower() if random_walk_name else ""
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -81,7 +84,7 @@ if __name__ == "__main__":
                         help='Name of the random walk strategy (Traditional, ERGRW, ERGRW_Adapted), optional')
     parser.add_argument('--tune', action='store_true', help='Flag to tune hyperparameters')
     parser.add_argument('--alpha', type=float, default=0.5, help='Alpha parameter for the ERGRW random walk generator')
-    parser.add_argument('--num_walks', type=int, default=4000, help='Number of valid walks to generate')
+    parser.add_argument('--num_walks', type=int, default=3000, help='Number of valid walks to generate')
     parser.add_argument('--walk_length', type=int, default=6, help='Length of each walk')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loading')
     parser.add_argument('--parent_output_dir', type=str,
