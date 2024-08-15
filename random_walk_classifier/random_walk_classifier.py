@@ -32,21 +32,21 @@ class RandomWalkClassifier:
         return predictions
 
 
-def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
+def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_dir):
     tune_str = "tune_" if tune else ""
-    batch_str = f"_batch{batch_size}" if not tune else ""
+    # batch_str = f"_batch{batch_size}" if not tune else ""
     alpha_str = f"_alpha{alpha}" if random_walk_name and random_walk_name != "traditional" else ""
     random_walk_name_str = f"{random_walk_name}" if random_walk_name else "codex"
 
     output_dir = os.path.join(parent_output_dir,
-                              f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}{batch_str}")
+                              f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}")
 
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
 
-def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir):
+def main(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_dir):
     random.seed(34)
 
     random_walk_name = random_walk_name.lower() if random_walk_name else ""
@@ -54,7 +54,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, pare
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create output directory based on hyperparameters
-    output_dir = create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, parent_output_dir)
+    output_dir = create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_dir)
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
@@ -73,8 +73,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, batch_size, pare
                                                   .prepare_datasets(random_walk_name, alpha, num_walks, walk_length))
 
     # Train and Evaluate Model
-    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device,
-                                 batch_size)
+    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device)
     model_trainer.train()
 
 
@@ -86,13 +85,12 @@ if __name__ == "__main__":
     parser.add_argument('--alpha', type=float, default=0.5, help='Alpha parameter for the ERGRW random walk generator')
     parser.add_argument('--num_walks', type=int, default=3000, help='Number of valid walks to generate')
     parser.add_argument('--walk_length', type=int, default=6, help='Length of each walk')
-    parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loading')
+    # parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loading')
     parser.add_argument('--parent_output_dir', type=str,
                         default="/content/drive/MyDrive/codex_random_walk", help='Directory to save the results')
     args = parser.parse_args()
 
-    main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.batch_size,
-         args.parent_output_dir)
+    main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.parent_output_dir)
     # Running script:
     # python random_walk_classifier/random_walk_classifier.py
     #       --random_walk Traditional --tune --alpha 0.6 --num_walks 5000 --walk_length 8 --batch_size 16
