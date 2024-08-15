@@ -45,10 +45,11 @@ class ModelTrainer:
             "classification_report": class_report
         }
 
-    def get_optimizer(self):
-        return SGD(self.classifier.model.parameters(), lr=self.best_params['learning_rate'])
+    def get_optimizer(self, params):
+        lr = params['learning_rate'] if params else self.best_params['learning_rate']
+        return SGD(self.classifier.model.parameters(), lr=lr)
 
-    def get_trainer(self, args, train_dataset, eval_dataset):
+    def get_trainer(self, args, train_dataset, eval_dataset, params=None):
         return Trainer(
             model=self.classifier.model,
             args=args,
@@ -57,7 +58,7 @@ class ModelTrainer:
             tokenizer=self.classifier.tokenizer,
             data_collator=WalkDataset.collate_fn,
             compute_metrics=self.compute_metrics,
-            optimizers=(self.get_optimizer(), None)  # Pass SGD as the optimizer
+            optimizers=(self.get_optimizer(params), None)  # Pass SGD as the optimizer
         )
 
     def create_data_loaders(self, batch_size):
@@ -111,7 +112,7 @@ class ModelTrainer:
                 logging_dir=f'{self.output_dir}/fine_tuning/logs',
             )
 
-            trainer = self.get_trainer(training_args, train_loader.dataset, valid_loader.dataset)
+            trainer = self.get_trainer(training_args, train_loader.dataset, valid_loader.dataset, params)
             trainer.train()
             eval_results = trainer.evaluate()
 
