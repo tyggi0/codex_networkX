@@ -46,16 +46,19 @@ class DataPreparation:
         # Load the Codex train split
         train_triples = self.codex.split("train")
 
-        # Split the train triples into two halves
-        mid_index = len(train_triples) // 2
-        first_half_triples = train_triples.iloc[:mid_index]
-        second_half_triples = train_triples.iloc[mid_index:]
+        # Assume equal proportions for valid and invalid walks for simplicity
+        total_size = len(train_triples)
+        sample_size = total_size // 4  # Each category gets half of half (half the dataset, equally split)
 
-        # Transform the first half into valid walks
-        train_valid_walks = self.transform_triples(first_half_triples)
+        # Sampling for valid walks
+        valid_triples_sampled = train_triples.sample(n=sample_size)
+        train_valid_walks = self.transform_triples(valid_triples_sampled)
 
-        # Corrupt the second half to generate invalid walks
-        train_invalid_walks = self.generator.generate_invalid_random_walks(self.transform_triples(second_half_triples))
+        # Corrupt equivalent amount for invalid walks, ensuring stratified sampling
+        remaining_triples = train_triples.drop(valid_triples_sampled.index)
+        invalid_triples_sampled = remaining_triples.sample(n=sample_size)
+        train_invalid_walks = self.generator.generate_invalid_random_walks(
+            self.transform_triples(invalid_triples_sampled))
 
         print("\nEncoded Train Walks:")
         train_walks, train_labels = self.encode_data(train_valid_walks, train_invalid_walks)

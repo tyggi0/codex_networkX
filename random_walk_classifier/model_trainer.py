@@ -3,10 +3,9 @@ import random
 
 import numpy as np
 import torch
-from torch.optim import SGD
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
-from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 
 from walk_dataset import WalkDataset
@@ -47,7 +46,7 @@ class ModelTrainer:
 
     def get_optimizer(self, params):
         lr = params['learning_rate'] if params else self.best_params['learning_rate']
-        return SGD(self.classifier.model.parameters(), lr=lr)
+        return Adam(self.classifier.model.parameters(), lr=lr)
 
     def get_trainer(self, args, train_dataset, eval_dataset, params=None):
         return Trainer(
@@ -74,7 +73,7 @@ class ModelTrainer:
     def tune_hyperparameters(self, n_iter=10):
         param_distributions = {
             'learning_rate': np.logspace(-5, -4, num=100),  # 1e-5 to 1e-4
-            'num_train_epochs': [3, 5, 7, 9],
+            'num_train_epochs': [3, 4, 5, 6],
             'per_device_train_batch_size': [16, 32],
             'warmup_ratio': [0.0, 0.1, 0.2]
         }
