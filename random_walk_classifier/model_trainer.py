@@ -70,7 +70,7 @@ class ModelTrainer:
                                  collate_fn=WalkDataset.collate_fn)
         return train_loader, valid_loader, test_loader
 
-    def tune_hyperparameters(self, n_iter=10):
+    def tune_hyperparameters(self, n_iter=1):
         param_distributions = {
             'learning_rate': np.logspace(-5, -4, num=100),  # 1e-5 to 1e-4
             'num_train_epochs': [3, 4, 5, 6],
