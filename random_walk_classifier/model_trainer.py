@@ -54,7 +54,7 @@ class ModelTrainer:
             "eval_accuracy": eval_accuracy,
             "roc_auc": roc_auc,
             "classification_report": class_report,
-            "confusion_matrix": conf_matrix
+            "confusion_matrix": conf_matrix.tolist()
         }
 
     def get_optimizer(self, args):
@@ -168,6 +168,7 @@ class ModelTrainer:
             if os.path.exists(output_dir_name):
                 last_checkpoint = get_last_checkpoint(output_dir_name)
 
+            print(f"Resuming from checkpoint: {last_checkpoint}")
             trainer.train(resume_from_checkpoint=last_checkpoint)
 
             eval_results = trainer.evaluate()
