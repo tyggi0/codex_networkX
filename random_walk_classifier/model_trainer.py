@@ -33,8 +33,15 @@ class ModelTrainer:
             labels = labels.detach().cpu().numpy()
 
         predictions = np.argmax(logits, axis=-1)
-        eval_accuracy = accuracy_score(labels, predictions)
         probabilities = torch.softmax(torch.tensor(logits), dim=-1).numpy()[:, 1]
+
+        # Print the modified logits and labels
+        print("\nCompute Metrics:")
+        print("Predictions after argmax (axis=-1):", predictions)
+        print("Probabilities after softmax (dim=-1):", probabilities)
+        print("Labels:", labels)
+
+        eval_accuracy = accuracy_score(labels, predictions)
         roc_auc = roc_auc_score(labels, probabilities)
 
         # Generate the classification report
