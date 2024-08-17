@@ -1,12 +1,14 @@
 import json
+import os
 import random
 
 import numpy as np
 import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
+from transformers import TrainingArguments, Trainer, EarlyStoppingCallback, get_linear_schedule_with_warmup
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, confusion_matrix
+from transformers.trainer_utils import get_last_checkpoint
 
 from walk_dataset import WalkDataset
 
@@ -38,26 +40,45 @@ class ModelTrainer:
         # Generate the classification report
         class_report = classification_report(labels, predictions, output_dict=True)
 
+        # Generate the confusion matrix
+        conf_matrix = confusion_matrix(labels, predictions)
+
         return {
             "eval_accuracy": eval_accuracy,
             "roc_auc": roc_auc,
-            "classification_report": class_report
+            "classification_report": class_report,
+            "confusion_matrix": conf_matrix
         }
 
-    def get_optimizer(self, params):
-        lr = params['learning_rate'] if params else self.best_params['learning_rate']
+    def get_optimizer(self, args):
+        lr = args.learning_rate if args else self.best_params['learning_rate']
         return Adam(self.classifier.model.parameters(), lr=lr)
 
-    def get_trainer(self, args, train_dataset, eval_dataset, params=None):
+    @staticmethod
+    def get_scheduler(optimizer, num_training_steps, warmup_steps):
+        # Use a linear learning rate scheduler with warmup
+        return get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=num_training_steps
+        )
+
+    def get_trainer(self, args, batch_size, total_steps, warmup_steps):
+        train_loader, valid_loader, _ = self.create_data_loaders(batch_size)
+
+        optimizer = self.get_optimizer(args)  # Pass the correct learning rate from `args`
+
+        lr_scheduler = self.get_scheduler(optimizer, num_training_steps=total_steps, warmup_steps=warmup_steps)
+
         return Trainer(
             model=self.classifier.model,
             args=args,
-            train_dataset=train_dataset,
-            eval_dataset=eval_dataset,
+            train_dataset=train_loader.dataset,
+            eval_dataset=valid_loader.dataset,
             tokenizer=self.classifier.tokenizer,
             data_collator=WalkDataset.collate_fn,
             compute_metrics=self.compute_metrics,
-            optimizers=(self.get_optimizer(params), None)  # Pass SGD as the optimizer
+            optimizers=(optimizer, lr_scheduler)  # Pass the optimizer and scheduler
         )
 
     def create_data_loaders(self, batch_size):
@@ -80,6 +101,14 @@ class ModelTrainer:
         best_params = None
         best_score = float('-inf')
 
+        completed_trials = set()
+
+        # Load completed trials from a file if it exists
+        completed_trials_file = f"{self.output_dir}/completed_trials.json"
+        if os.path.exists(completed_trials_file):
+            with open(completed_trials_file, 'r') as f:
+                completed_trials = set(json.load(f))
+
         for _ in range(n_iter):
             # Randomly sample hyperparameters
             params = {
@@ -88,13 +117,18 @@ class ModelTrainer:
                 'per_device_train_batch_size': random.choice(param_distributions['per_device_train_batch_size']),
                 'warmup_ratio': random.choice(param_distributions['warmup_ratio']),
             }
+
+            params_tuple = tuple(params.items())
+
+            if params_tuple in completed_trials:
+                print(f"Skipping completed parameters: {params}")
+                continue
+
             batch_size = params['per_device_train_batch_size']
             total_steps = len(self.train_dataset) // batch_size * params['num_train_epochs']
             warmup_steps = int(total_steps * params['warmup_ratio'])
 
             print(f"Trying parameters: {params} with warmup_steps={warmup_steps}")
-
-            train_loader, valid_loader, _ = self.create_data_loaders(batch_size)
 
             # Create a directory name that includes the chosen parameters
             output_dir_name = (f"{self.output_dir}/fine_tuning_lr{params['learning_rate']}_"
@@ -114,14 +148,21 @@ class ModelTrainer:
                 weight_decay=0.01,
                 warmup_steps=warmup_steps,
                 logging_strategy="epoch",  # ELog training data stats for loss
-                logging_dir=f'{self.output_dir}/fine_tuning/logs',
+                logging_dir=f'{output_dir_name}/logs',
                 load_best_model_at_end=True,  # Load the best model at the end of training
                 metric_for_best_model="eval_accuracy",  # Specify the metric to use for selecting the best model
                 greater_is_better=True,  # Specify that higher metric values are better
             )
 
-            trainer = self.get_trainer(training_args, train_loader.dataset, valid_loader.dataset, params)
-            trainer.train()
+            trainer = self.get_trainer(training_args, batch_size, total_steps, warmup_steps)
+
+            # Check if there's a checkpoint available to resume from
+            last_checkpoint = None
+            if os.path.exists(output_dir_name):
+                last_checkpoint = get_last_checkpoint(output_dir_name)
+
+            trainer.train(resume_from_checkpoint=last_checkpoint)
+
             eval_results = trainer.evaluate()
 
             print(f"Evaluation results: {eval_results}")
@@ -129,6 +170,11 @@ class ModelTrainer:
             if eval_results['eval_accuracy'] > best_score:
                 best_score = eval_results['eval_accuracy']
                 best_params = params
+
+            # Mark this set of parameters as completed
+            completed_trials.add(params_tuple)
+            with open(completed_trials_file, 'w') as f:
+                json.dump(list(completed_trials), f)
 
         self.best_params = best_params
 
@@ -141,8 +187,18 @@ class ModelTrainer:
 
     def train(self):
         if self.tune:
-            print("Tuning hyperparameters...")
-            self.tune_hyperparameters()
+            # Path to the best hyperparameters file
+            best_params_file = os.path.join(self.output_dir, 'best_hyperparameters.json')
+
+            if os.path.exists(best_params_file):
+                # Load the best hyperparameters from the file if it exists
+                print("Loading best hyperparameters from file...")
+                with open(best_params_file, 'r') as f:
+                    self.best_params = json.load(f)
+            else:
+                # If the file doesn't exist, tune the hyperparameters
+                print("Tuning hyperparameters...")
+                self.tune_hyperparameters()
         else:
             # If not tuning, set default best_params
             self.best_params = {
@@ -172,7 +228,7 @@ class ModelTrainer:
             num_train_epochs=self.best_params['num_train_epochs'],
             weight_decay=0.01,
             warmup_steps=warmup_steps,
-            logging_dir=f'{self.output_dir}/training/logs',
+            logging_dir=f'{output_dir_name}/logs',
             logging_strategy="epoch",
             load_best_model_at_end=True,  # Load the best model at the end of training
             metric_for_best_model="eval_accuracy",  # Specify the metric to use for selecting the best model
@@ -184,7 +240,7 @@ class ModelTrainer:
 
         train_loader, valid_loader, test_loader = self.create_data_loaders(batch_size)
 
-        trainer = self.get_trainer(training_args, train_loader.dataset, valid_loader.dataset)
+        trainer = self.get_trainer(training_args, batch_size, total_steps, warmup_steps)
 
         # Add the early stopping callback
         trainer.add_callback(early_stopping)
