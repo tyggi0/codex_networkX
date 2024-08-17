@@ -111,11 +111,11 @@ class ModelTrainer:
         completed_trials = set()
 
         # Load completed trials from a file if it exists
-        completed_trials_file = f"{self.output_dir}/completed_trials.json"
+        completed_trials_file = os.path.join(self.output_dir, 'completed_trials.json')
         if os.path.exists(completed_trials_file):
             with open(completed_trials_file, 'r') as f:
-                # Convert each trial list to a tuple to make it hashable
-                completed_trials = {tuple(trial) for trial in json.load(f)}
+                # Convert each trial list of lists to a tuple of tuples to make it hashable
+                completed_trials = {tuple(tuple(pair) for pair in trial) for trial in json.load(f)}
 
         for _ in range(n_iter):
             # Randomly sample hyperparameters
