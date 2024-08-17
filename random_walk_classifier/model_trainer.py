@@ -109,6 +109,9 @@ class ModelTrainer:
                 warmup_steps=warmup_steps,
                 logging_strategy="epoch",  # ELog training data stats for loss
                 logging_dir=f'{self.output_dir}/fine_tuning/logs',
+                load_best_model_at_end=True,  # Load the best model at the end of training
+                metric_for_best_model="eval_accuracy",  # Specify the metric to use for selecting the best model
+                greater_is_better=True,  # Specify that higher metric values are better
             )
 
             trainer = self.get_trainer(training_args, train_loader.dataset, valid_loader.dataset, params)
@@ -159,6 +162,9 @@ class ModelTrainer:
             warmup_steps=warmup_steps,
             logging_dir=f'{self.output_dir}/training/logs',
             logging_strategy="epoch",
+            load_best_model_at_end=True,  # Load the best model at the end of training
+            metric_for_best_model="eval_accuracy",  # Specify the metric to use for selecting the best model
+            greater_is_better=True,  # Specify that higher metric values are better
         )
 
         # Initialize early stopping callback
