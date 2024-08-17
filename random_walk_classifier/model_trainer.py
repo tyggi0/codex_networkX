@@ -70,7 +70,7 @@ class ModelTrainer:
                                  collate_fn=WalkDataset.collate_fn)
         return train_loader, valid_loader, test_loader
 
-    def tune_hyperparameters(self, n_iter=1):
+    def tune_hyperparameters(self, n_iter=5):
         param_distributions = {
             'learning_rate': np.logspace(-5, -4, num=100),  # 1e-5 to 1e-4
             'num_train_epochs': [3, 4, 5, 6],
@@ -96,8 +96,14 @@ class ModelTrainer:
 
             train_loader, valid_loader, _ = self.create_data_loaders(batch_size)
 
+            # Create a directory name that includes the chosen parameters
+            output_dir_name = (f"{self.output_dir}/fine_tuning_lr{params['learning_rate']}_"
+                               f"epochs{params['num_train_epochs']}_"
+                               f"batch{params['per_device_train_batch_size']}_"
+                               f"warmup{params['warmup_ratio']}")
+
             training_args = TrainingArguments(
-                output_dir=f'{self.output_dir}/fine_tuning',
+                output_dir=output_dir_name,
                 evaluation_strategy='epoch',  # Evaluate at the end of each epoch
                 save_strategy='epoch',  # Save a checkpoint at the end of each epoch
                 save_total_limit=10,  # Only keep the last 10 checkpoints
@@ -150,8 +156,14 @@ class ModelTrainer:
         total_steps = len(self.train_dataset) // batch_size * self.best_params['num_train_epochs']
         warmup_steps = int(self.best_params.get('warmup_ratio', 0.1) * total_steps)
 
+        # Create a directory name that includes the chosen parameters
+        output_dir_name = (f"{self.output_dir}/training_lr{self.best_params['learning_rate']}_"
+                           f"epochs{self.best_params['num_train_epochs']}_"
+                           f"batch{self.best_params['per_device_train_batch_size']}_"
+                           f"warmup{self.best_params['warmup_ratio']}")
+
         training_args = TrainingArguments(
-            output_dir=f"{self.output_dir}/training",
+            output_dir=output_dir_name,
             evaluation_strategy='epoch',  # Evaluate at the end of each epoch
             save_strategy='epoch',  # Save a checkpoint at the end of each epoch
             learning_rate=self.best_params['learning_rate'],
