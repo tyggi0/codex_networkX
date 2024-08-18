@@ -48,9 +48,7 @@ class ModelTrainer:
                                   collate_fn=WalkDataset.collate_fn)
         valid_loader = DataLoader(self.valid_dataset, batch_size=batch_size, shuffle=False,
                                   collate_fn=WalkDataset.collate_fn)
-        test_loader = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False,
-                                 collate_fn=WalkDataset.collate_fn)
-        return train_loader, valid_loader, test_loader
+        return train_loader, valid_loader
 
     def tune_hyperparameters(self, n_iter=5):
         param_distributions = {
@@ -173,7 +171,7 @@ class ModelTrainer:
         logging_dir = f'{output_dir_name}/logs'
         os.makedirs(logging_dir, exist_ok=True)
 
-        train_loader, valid_loader, _ = self.create_data_loaders(batch_size)
+        train_loader, valid_loader = self.create_data_loaders(batch_size)
 
         loss_fn = CrossEntropyLoss()
 
@@ -202,6 +200,30 @@ class ModelTrainer:
                 if no_improvement_epochs >= self.early_stopping_patience:
                     print("Early stopping triggered.")
                     break
+
+    def load_checkpoint(self, checkpoint_path, warmup_steps, total_steps):
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        self.classifier.model.load_state_dict(checkpoint['model_state_dict'])
+
+        # Re-create the optimizer
+        optimizer = Adam(self.classifier.model.parameters(),
+                         lr=checkpoint['optimizer_state_dict']['param_groups'][0]['lr'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        # Re-create the scheduler with the correct lr_lambda
+        def lr_lambda(current_step):
+            if current_step < warmup_steps:
+                return float(current_step) / float(max(1, warmup_steps))
+            return max(0.0, float(total_steps - current_step) / float(max(1, total_steps - warmup_steps)))
+
+        if checkpoint['scheduler_state_dict']:
+            scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        else:
+            scheduler = None
+
+        print(f"Model loaded from {checkpoint_path}")
+        return optimizer, scheduler
 
     @staticmethod
     def save_checkpoint(epoch, model, optimizer, scheduler, eval_accuracy, output_dir_name):
@@ -256,13 +278,9 @@ class ModelTrainer:
 
         return link_prob
 
-    def evaluate(self):
+    def evaluate(self, batch_size=16):
         # Create a DataLoader for the test dataset
-        test_loader = DataLoader(self.test_dataset, batch_size=16, shuffle=False, collate_fn=WalkDataset.collate_fn)
-
-        # Get class weights for the loss function if needed (useful if using class weights during training)
-        class_weights = self.get_class_weights()
-        loss_fn = CrossEntropyLoss(weight=class_weights)
+        test_loader = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False, collate_fn=WalkDataset.collate_fn)
 
         # Set the model to evaluation mode
         self.classifier.model.eval()
@@ -284,7 +302,7 @@ class ModelTrainer:
                 logits = outputs.logits
 
                 # Compute the loss
-                loss = loss_fn(logits, labels)
+                loss = CrossEntropyLoss(logits, labels)
                 total_loss += loss.item()
 
                 # Collect the logits and labels for metric computation
@@ -300,7 +318,7 @@ class ModelTrainer:
 
         # Compute evaluation metrics
         test_metrics = self.compute_metrics(all_logits, all_labels)
-        test_metrics["test_loss"] = avg_loss  # Optionally add the average loss to the metrics
+        test_metrics["test_loss"] = avg_loss  # Add the average loss to the metrics
 
         # Print the test metrics
         print(f"Test Metrics: {test_metrics}")
@@ -317,6 +335,25 @@ class ModelTrainer:
         if self.tune:
             best_params = self.tune_hyperparameters()
             print(f"Best hyperparameters: {best_params}")
+
+            # Recover the best model
+            output_dir_name = (f"{self.output_dir}/training_lr{best_params['learning_rate']}_"
+                               f"epochs{best_params['num_train_epochs']}_"
+                               f"batch{best_params['per_device_train_batch_size']}_"
+                               f"warmup{best_params['warmup_ratio']}")
+            checkpoint_dir = os.path.join(output_dir_name, f"checkpoint_epoch_{self.best_eval_accuracy:.4f}")
+            checkpoint_path = os.path.join(checkpoint_dir, 'checkpoint.pth')
+
+            # Calculate warmup steps and total steps
+            batch_size = best_params['per_device_train_batch_size']
+            total_steps = len(self.train_dataset) // batch_size * best_params['num_train_epochs']
+            warmup_steps = int(total_steps * best_params['warmup_ratio'])
+
+            optimizer, scheduler = self.load_checkpoint(checkpoint_path, warmup_steps, total_steps)
+
+            # Evaluate the model with the best hyperparameters
+            self.evaluate(batch_size=batch_size)
         else:
             self.train()
-        self.evaluate()
+            self.evaluate()
+

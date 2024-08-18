@@ -74,7 +74,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_di
 
     # Train and Evaluate Model
     model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device)
-    model_trainer.train()
+    model_trainer.run()
 
 
 if __name__ == "__main__":
