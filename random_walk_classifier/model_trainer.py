@@ -169,7 +169,7 @@ class ModelTrainer:
         metrics = self.compute_metrics(all_logits, all_labels)
         return avg_loss, metrics
 
-    def train(self, epochs=5, batch_size=16, learning_rate=0.01, momentum=0.9, warmup_steps=0, weight_decay=0.01):
+    def train(self, epochs=7, batch_size=16, learning_rate=0.0001, momentum=0.91, warmup_steps=0, weight_decay=0.01):
         output_dir_name = (f"{self.output_dir}/training_lr{learning_rate}_"
                            f"epochs{epochs}_"
                            f"batch{batch_size}_"
