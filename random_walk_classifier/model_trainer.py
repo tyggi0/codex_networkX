@@ -119,7 +119,7 @@ class ModelTrainer:
             labels = batch['labels'].to(self.device)
 
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-            logits = outputs
+            logits = outputs.logits
 
             loss = loss_fn(logits, labels)
             loss.backward()
@@ -146,7 +146,7 @@ class ModelTrainer:
                 labels = batch['labels'].to(self.device)
 
                 outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-                logits = outputs
+                logits = outputs.logits
 
                 loss = loss_fn(logits, labels)
                 total_loss += loss.item()
@@ -303,7 +303,7 @@ class ModelTrainer:
 
                 # Get the model's predictions
                 outputs = self.classifier.model(input_ids=input_ids, attention_mask=attention_mask)
-                logits = outputs
+                logits = outputs.logits
 
                 # Compute the loss
                 loss = CrossEntropyLoss(logits, labels)
