@@ -3,14 +3,19 @@ import os
 import random
 import numpy as np
 import torch
-from torch.optim import Adam, SGD
+from torch.optim import SGD
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, confusion_matrix
 from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
+import logging
 
 from walk_dataset import WalkDataset
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class ModelTrainer:
@@ -50,12 +55,13 @@ class ModelTrainer:
                                   collate_fn=WalkDataset.collate_fn)
         return train_loader, valid_loader
 
-    def tune_hyperparameters(self, n_iter=5):
+    def tune_hyperparameters(self, n_iter=4):
         param_distributions = {
-            'learning_rate': np.logspace(-5, -4, num=100),  # 1e-5 to 1e-4
-            'num_train_epochs': [3, 4, 5, 6],
+            'learning_rate': np.logspace(-5, -4, num=50),  # 1e-5 to 1e-4
+            'num_train_epochs': [3, 5, 7, 9],
             'per_device_train_batch_size': [16, 32],
-            'warmup_ratio': [0.0, 0.1, 0.2]
+            'warmup_ratio': [0.0, 0.1, 0.2],
+            'momentum': np.linspace(0.8, 0.99, num=20)  # Momentum added here
         }
         best_params = None
         best_score = float('-inf')
@@ -72,25 +78,27 @@ class ModelTrainer:
                 'num_train_epochs': random.choice(param_distributions['num_train_epochs']),
                 'per_device_train_batch_size': random.choice(param_distributions['per_device_train_batch_size']),
                 'warmup_ratio': random.choice(param_distributions['warmup_ratio']),
+                'momentum': random.choice(param_distributions['momentum']),  # Momentum included here
             }
 
             params_tuple = tuple(params.items())
             if params_tuple in completed_trials:
-                print(f"Skipping completed parameters: {params}")
+                logger.info(f"Skipping completed parameters: {params}")
                 continue
 
             batch_size = params['per_device_train_batch_size']
             total_steps = len(self.train_dataset) // batch_size * params['num_train_epochs']
             warmup_steps = int(total_steps * params['warmup_ratio'])
 
-            print(f"Trying parameters: {params} with warmup_steps={warmup_steps}")
+            logger.info(f"Trying parameters: {params} with warmup_steps={warmup_steps}")
             self.train(epochs=params['num_train_epochs'],
                        batch_size=batch_size,
                        learning_rate=params['learning_rate'],
+                       momentum=params['momentum'],
                        warmup_steps=warmup_steps)
 
             eval_results = self.best_eval_accuracy
-            print(f"Evaluation results: {eval_results}")
+            logger.info(f"Evaluation results: {eval_results}")
 
             if eval_results > best_score:
                 best_score = eval_results
@@ -98,13 +106,13 @@ class ModelTrainer:
 
             completed_trials.add(params_tuple)
             with open(completed_trials_file, 'w') as f:
-                json.dump(list(completed_trials), f)
+                json.dump([list(k) for k in completed_trials], f)  # Convert tuple to list for JSON serialization
 
         self.best_params = best_params
         with open(f'{self.output_dir}/best_hyperparameters.json', 'w') as f:
             json.dump(best_params, f, indent=4)
 
-        print(f"Best parameters found: {best_params} with accuracy {best_score}")
+        logger.info(f"Best parameters found: {best_params} with accuracy {best_score}")
         return best_params
 
     def train_epoch(self, model, train_loader, optimizer, loss_fn, scheduler=None):
@@ -185,13 +193,13 @@ class ModelTrainer:
         no_improvement_epochs = 0
 
         for epoch in range(epochs):
-            print(f"Epoch {epoch + 1}/{epochs}")
+            logger.info(f"Epoch {epoch + 1}/{epochs}")
 
             train_loss = self.train_epoch(self.classifier.model, train_loader, optimizer, loss_fn, scheduler)
             valid_loss, metrics = self.validate_epoch(self.classifier.model, valid_loader, loss_fn)
 
-            print(f"Training Loss: {train_loss:.4f}, Validation Loss: {valid_loss:.4f}")
-            print(f"Validation Metrics: {metrics}")
+            logger.info(f"Training Loss: {train_loss:.4f}, Validation Loss: {valid_loss:.4f}")
+            logger.info(f"Validation Metrics: {metrics}")
 
             eval_accuracy = metrics['eval_accuracy']
             if eval_accuracy > self.best_eval_accuracy:
@@ -201,7 +209,7 @@ class ModelTrainer:
             else:
                 no_improvement_epochs += 1
                 if no_improvement_epochs >= self.early_stopping_patience:
-                    print("Early stopping triggered.")
+                    logger.info("Early stopping triggered.")
                     break
 
     def load_checkpoint(self, checkpoint_path, warmup_steps, total_steps):
@@ -226,7 +234,7 @@ class ModelTrainer:
         else:
             scheduler = None
 
-        print(f"Model loaded from {checkpoint_path}")
+        logger.info(f"Model loaded from {checkpoint_path}")
         return optimizer, scheduler
 
     @staticmethod
@@ -243,7 +251,7 @@ class ModelTrainer:
         }
 
         torch.save(checkpoint, os.path.join(checkpoint_dir, 'checkpoint.pth'))
-        print(f"Checkpoint saved to {checkpoint_dir}")
+        logger.info(f"Checkpoint saved to {checkpoint_dir}")
 
     def predict_link(self, entity1, entity2, relation):
         """
@@ -284,7 +292,8 @@ class ModelTrainer:
 
     def evaluate(self, batch_size=16):
         # Create a DataLoader for the test dataset
-        test_loader = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False, collate_fn=WalkDataset.collate_fn)
+        test_loader = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False,
+                                 collate_fn=WalkDataset.collate_fn)
 
         # Set the model to evaluation mode
         self.classifier.model.eval()
@@ -306,7 +315,7 @@ class ModelTrainer:
                 logits = outputs.logits
 
                 # Compute the loss
-                loss = CrossEntropyLoss(logits, labels)
+                loss = CrossEntropyLoss()(logits, labels)  # Corrected to apply the loss function correctly
                 total_loss += loss.item()
 
                 # Collect the logits and labels for metric computation
@@ -325,20 +334,20 @@ class ModelTrainer:
         test_metrics["test_loss"] = avg_loss  # Add the average loss to the metrics
 
         # Print the test metrics
-        print(f"Test Metrics: {test_metrics}")
+        logger.info(f"Test Metrics: {test_metrics}")
 
         # Save the final evaluation results to a JSON file
         final_results_path = os.path.join(self.output_dir, "final_evaluation_results.json")
         with open(final_results_path, "w") as f:
             json.dump(test_metrics, f, indent=4)
-        print(f"Evaluation results saved to {final_results_path}")
+        logger.info(f"Evaluation results saved to {final_results_path}")
 
         return test_metrics
 
     def run(self):
         if self.tune:
             best_params = self.tune_hyperparameters()
-            print(f"Best hyperparameters: {best_params}")
+            logger.info(f"Best hyperparameters: {best_params}")
 
             # Recover the best model
             output_dir_name = (f"{self.output_dir}/training_lr{best_params['learning_rate']}_"
@@ -360,4 +369,3 @@ class ModelTrainer:
         else:
             self.train()
             self.evaluate()
-

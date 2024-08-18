@@ -1,6 +1,10 @@
 import re
-
+import logging
 from walk_dataset import WalkDataset
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def clean_description(description):
@@ -60,15 +64,15 @@ class DataPreparation:
         walks = encoded_valid_walks + encoded_invalid_walks
         labels = labels_valid + labels_invalid
 
-        print(f"Total encoded valid walks: {len(encoded_valid_walks)}")
-        print(f"Total encoded invalid walks: {len(encoded_invalid_walks)}")
-        print(f"Total combined walks: {len(walks)}")
+        logger.info(f"Total encoded valid walks: {len(encoded_valid_walks)}")
+        logger.info(f"Total encoded invalid walks: {len(encoded_invalid_walks)}")
+        logger.info(f"Total combined walks: {len(walks)}")
 
-        # Print first 10 valid and invalid walks
+        # Log first 10 valid and invalid walks
         for i, walk in enumerate(encoded_valid_walks[:10]):
-            print(f"Valid Walk {i + 1}: {walk}")
+            logger.info(f"Valid Walk {i + 1}: {walk}")
         for i, walk in enumerate(encoded_invalid_walks[:10]):
-            print(f"Invalid Walk {i + 1}: {walk}")
+            logger.info(f"Invalid Walk {i + 1}: {walk}")
 
         return walks, labels
 
@@ -90,7 +94,7 @@ class DataPreparation:
         train_invalid_walks = self.generator.generate_invalid_random_walks(
             self.transform_triples(invalid_triples_sampled))
 
-        print("\nEncoded Train Walks:")
+        logger.info("\nEncoded Train Walks:")
         train_walks, train_labels = self.encode_data(train_valid_walks, train_invalid_walks)
 
         if random_walk_strategy:
@@ -98,17 +102,17 @@ class DataPreparation:
             valid_walks = self.generator.generate_random_walks(random_walk_strategy, alpha, num_walks, walk_length)
             invalid_walks = self.generator.generate_invalid_random_walks(valid_walks)
 
-            print("\nEncoded Train **Random** Walks:")
-            walks, labels = self.encode_data(valid_walks, invalid_walks)
+            logger.info("\nEncoded Train **Random** Walks:")
+            random_walks, labels = self.encode_data(valid_walks, invalid_walks)
 
             # Combine the walks and labels from the Codex split and random walks
-            combined_walks = walks + train_walks
+            combined_walks = random_walks + train_walks
             combined_labels = labels + train_labels
 
             dataset = WalkDataset(combined_walks, combined_labels, self.classifier.tokenizer)
 
         else:
-            print("No random walk strategy provided, using only Codex dataset.")
+            logger.info("No random walk strategy provided, using only Codex dataset.")
             dataset = WalkDataset(train_walks, train_labels, self.classifier.tokenizer)
 
         return dataset
@@ -120,14 +124,14 @@ class DataPreparation:
         valid_walks = self.transform_triples(valid_triples)
         invalid_walks = self.transform_triples(invalid_triples)
 
-        print(f"\nEncoded {split.capitalize()} Walks:")
+        logger.info(f"\nEncoded {split.capitalize()} Walks:")
         walks, labels = self.encode_data(valid_walks, invalid_walks)
 
         dataset = WalkDataset(walks, labels, self.classifier.tokenizer)
         return dataset
 
     def prepare_datasets(self, random_walk_strategy, alpha, num_walks, walk_length):
-        print("Preparing datasets...")
+        logger.info("Preparing datasets...")
 
         # Prepare training dataset from the graph
         train_dataset = self.prepare_train_dataset(random_walk_strategy, alpha, num_walks, walk_length)
