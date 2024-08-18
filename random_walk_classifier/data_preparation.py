@@ -10,15 +10,37 @@ class DataPreparation:
     def transform_triples(self, triples):
         transformed = []
         for head, relation, tail in triples.values:
-            head_label = self.codex.entity_description(head)
-            relation_label = self.codex.relation_description(relation)
-            tail_label = self.codex.entity_description(tail)
+            head_label = f"{self.codex.entity_label(head)}: {self.codex.entity_description(head)}"
+            relation_label = f"{self.codex.relation_label(relation)}: {self.codex.relation_description(relation)}"
+            tail_label = f"{self.codex.entity_label(tail)}: {self.codex.entity_description(tail)}"
             transformed.append([head_label, relation_label, tail_label])
         return transformed
 
     @staticmethod
     def encode_walks(walks):
-        return [' '.join(map(str, walk)) for walk in walks]
+        """
+        Encode walks into a format suitable for BERT input, including both labels and descriptions.
+
+        Args:
+            walks (list of lists): A list of walks, where each walk is a sequence of alternating entities and relations.
+
+        Returns:
+            list of str: A list of encoded strings, one for each walk.
+        """
+        encoded_walks = []
+
+        for walk in walks:
+            encoded_walk = []
+            for i, element in enumerate(walk):
+                if i % 2 == 0:  # Even index: Entity
+                    encoded_walk.append(f"[ENTITY{i // 2 + 1}] {element} [/ENTITY{i // 2 + 1}]")
+                else:  # Odd index: Relation
+                    encoded_walk.append(f"[RELATION{i // 2 + 1}] {element} [/RELATION{i // 2 + 1}]")
+
+            # Join the parts into a single string for BERT input
+            encoded_walks.append(' '.join(encoded_walk))
+
+        return encoded_walks
 
     def encode_data(self, valid_walks, invalid_walks):
         encoded_valid_walks = self.encode_walks(valid_walks)
@@ -59,6 +81,13 @@ class DataPreparation:
         invalid_triples_sampled = remaining_triples.sample(n=sample_size)
         train_invalid_walks = self.generator.generate_invalid_random_walks(
             self.transform_triples(invalid_triples_sampled))
+
+        print("\nTrain Walks:")
+        # Print first 10 valid and invalid walks
+        for i, walk in enumerate(train_valid_walks[:10]):
+            print(f"Valid Walk {i + 1}: {walk}")
+        for i, walk in enumerate(train_invalid_walks[:10]):
+            print(f"Invalid Walk {i + 1}: {walk}")
 
         print("\nEncoded Train Walks:")
         train_walks, train_labels = self.encode_data(train_valid_walks, train_invalid_walks)

@@ -13,8 +13,8 @@ class Graph:
             relation_label = self.codex.relation_label(relation)
             tail_label = self.codex.entity_label(tail)
             G.add_edge(head_label, tail_label, key=relation_label)
-            # Solve no neighbour problem, add inverse relation
-            G.add_edge(tail_label, head_label, key=f"reverse_{relation_label}")
+            # Solve no neighbour problem, add reverse relation
+            G.add_edge(tail_label, head_label, key=f"REVERSE {relation_label}")
         return G
 
     def load_graph(self):
