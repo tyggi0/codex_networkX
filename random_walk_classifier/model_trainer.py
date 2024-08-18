@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, confusion_matrix
 from torch.nn import CrossEntropyLoss
+from tqdm import tqdm
 
 from walk_dataset import WalkDataset
 
@@ -111,7 +112,7 @@ class ModelTrainer:
         model.train()
         total_loss = 0
 
-        for batch in train_loader:
+        for batch in tqdm(train_loader, desc="Training", leave=False):
             optimizer.zero_grad()
 
             input_ids = batch['input_ids'].to(self.device)
@@ -140,7 +141,7 @@ class ModelTrainer:
         all_labels = []
 
         with torch.no_grad():
-            for batch in valid_loader:
+            for batch in tqdm(valid_loader, desc="Validating", leave=False):
                 input_ids = batch['input_ids'].to(self.device)
                 attention_mask = batch['attention_mask'].to(self.device)
                 labels = batch['labels'].to(self.device)
@@ -292,7 +293,7 @@ class ModelTrainer:
 
         # Iterate over the test dataset
         with torch.no_grad():
-            for batch in test_loader:
+            for batch in tqdm(test_loader, desc="Evaluating", leave=False):
                 input_ids = batch['input_ids'].to(self.device)
                 attention_mask = batch['attention_mask'].to(self.device)
                 labels = batch['labels'].to(self.device)
