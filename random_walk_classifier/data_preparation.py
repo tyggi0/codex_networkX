@@ -10,9 +10,9 @@ class DataPreparation:
     def transform_triples(self, triples):
         transformed = []
         for head, relation, tail in triples.values:
-            head_label = self.codex.entity_label(head)
-            relation_label = self.codex.relation_label(relation)
-            tail_label = self.codex.entity_label(tail)
+            head_label = self.codex.entity_description(head)
+            relation_label = self.codex.relation_description(relation)
+            tail_label = self.codex.entity_description(tail)
             transformed.append([head_label, relation_label, tail_label])
         return transformed
 

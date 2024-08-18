@@ -1,14 +1,14 @@
 import json
 import os
 import random
-
 import numpy as np
 import torch
+from sklearn.utils import compute_class_weight
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from transformers import TrainingArguments, Trainer, EarlyStoppingCallback, get_linear_schedule_with_warmup
+from torch.optim.lr_scheduler import LambdaLR
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, confusion_matrix
-from transformers.trainer_utils import get_last_checkpoint
+from torch.nn import CrossEntropyLoss
 
 from walk_dataset import WalkDataset
 
@@ -23,31 +23,17 @@ class ModelTrainer:
         self.test_dataset = test_dataset
         self.device = device
         self.best_params = None
+        self.best_eval_accuracy = 0.0
+        self.early_stopping_patience = 3  # Define early stopping patience
 
     @staticmethod
-    def compute_metrics(eval_pred):
-        logits, labels = eval_pred
-        if isinstance(logits, torch.Tensor):
-            logits = logits.detach().cpu().numpy()
-        if isinstance(labels, torch.Tensor):
-            labels = labels.detach().cpu().numpy()
-
+    def compute_metrics(logits, labels):
         predictions = np.argmax(logits, axis=-1)
         probabilities = torch.softmax(torch.tensor(logits), dim=-1).numpy()[:, 1]
 
-        # Print the modified logits and labels
-        print("\nCompute Metrics:")
-        print("Predictions after argmax (axis=-1):", predictions)
-        print("Probabilities after softmax (dim=-1):", probabilities)
-        print("Labels:", labels)
-
         eval_accuracy = accuracy_score(labels, predictions)
         roc_auc = roc_auc_score(labels, probabilities)
-
-        # Generate the classification report
         class_report = classification_report(labels, predictions, output_dict=True)
-
-        # Generate the confusion matrix
         conf_matrix = confusion_matrix(labels, predictions)
 
         return {
@@ -57,39 +43,7 @@ class ModelTrainer:
             "confusion_matrix": conf_matrix.tolist()
         }
 
-    def get_optimizer(self, args):
-        lr = args.learning_rate if args else self.best_params['learning_rate']
-        return Adam(self.classifier.model.parameters(), lr=lr)
-
-    @staticmethod
-    def get_scheduler(optimizer, num_training_steps, warmup_steps):
-        # Use a linear learning rate scheduler with warmup
-        return get_linear_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=warmup_steps,
-            num_training_steps=num_training_steps
-        )
-
-    def get_trainer(self, args, batch_size, total_steps, warmup_steps):
-        train_loader, valid_loader, _ = self.create_data_loaders(batch_size)
-
-        optimizer = self.get_optimizer(args)  # Pass the correct learning rate from `args`
-
-        lr_scheduler = self.get_scheduler(optimizer, num_training_steps=total_steps, warmup_steps=warmup_steps)
-
-        return Trainer(
-            model=self.classifier.model,
-            args=args,
-            train_dataset=train_loader.dataset,
-            eval_dataset=valid_loader.dataset,
-            tokenizer=self.classifier.tokenizer,
-            data_collator=WalkDataset.collate_fn,
-            compute_metrics=self.compute_metrics,
-            optimizers=(optimizer, lr_scheduler)  # Pass the optimizer and scheduler
-        )
-
     def create_data_loaders(self, batch_size):
-        # Prepare data loaders from datasets
         train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True,
                                   collate_fn=WalkDataset.collate_fn)
         valid_loader = DataLoader(self.valid_dataset, batch_size=batch_size, shuffle=False,
@@ -109,16 +63,12 @@ class ModelTrainer:
         best_score = float('-inf')
 
         completed_trials = set()
-
-        # Load completed trials from a file if it exists
         completed_trials_file = os.path.join(self.output_dir, 'completed_trials.json')
         if os.path.exists(completed_trials_file):
             with open(completed_trials_file, 'r') as f:
-                # Convert each trial list of lists to a tuple of tuples to make it hashable
                 completed_trials = {tuple(tuple(pair) for pair in trial) for trial in json.load(f)}
 
         for _ in range(n_iter):
-            # Randomly sample hyperparameters
             params = {
                 'learning_rate': random.choice(param_distributions['learning_rate']),
                 'num_train_epochs': random.choice(param_distributions['num_train_epochs']),
@@ -127,7 +77,6 @@ class ModelTrainer:
             }
 
             params_tuple = tuple(params.items())
-
             if params_tuple in completed_trials:
                 print(f"Skipping completed parameters: {params}")
                 continue
@@ -137,160 +86,237 @@ class ModelTrainer:
             warmup_steps = int(total_steps * params['warmup_ratio'])
 
             print(f"Trying parameters: {params} with warmup_steps={warmup_steps}")
+            self.train(epochs=params['num_train_epochs'],
+                       batch_size=batch_size,
+                       learning_rate=params['learning_rate'],
+                       warmup_steps=warmup_steps)
 
-            # Create a directory name that includes the chosen parameters
-            output_dir_name = (f"{self.output_dir}/fine_tuning_lr{params['learning_rate']}_"
-                               f"epochs{params['num_train_epochs']}_"
-                               f"batch{params['per_device_train_batch_size']}_"
-                               f"warmup{params['warmup_ratio']}")
-
-            training_args = TrainingArguments(
-                output_dir=output_dir_name,
-                evaluation_strategy='epoch',  # Evaluate at the end of each epoch
-                save_strategy='epoch',  # Save a checkpoint at the end of each epoch
-                save_total_limit=10,  # Only keep the last 10 checkpoints
-                learning_rate=params['learning_rate'],
-                per_device_train_batch_size=batch_size,
-                per_device_eval_batch_size=batch_size,
-                num_train_epochs=params['num_train_epochs'],
-                weight_decay=0.01,
-                warmup_steps=warmup_steps,
-                logging_strategy="epoch",  # ELog training data stats for loss
-                logging_dir=f'{output_dir_name}/logs',
-                load_best_model_at_end=True,  # Load the best model at the end of training
-                metric_for_best_model="eval_accuracy",  # Specify the metric to use for selecting the best model
-                greater_is_better=True,  # Specify that higher metric values are better
-            )
-
-            trainer = self.get_trainer(training_args, batch_size, total_steps, warmup_steps)
-
-            # Check if there's a checkpoint available to resume from
-            last_checkpoint = None
-            if os.path.exists(output_dir_name):
-                last_checkpoint = get_last_checkpoint(output_dir_name)
-
-            print(f"Resuming from checkpoint: {last_checkpoint}")
-            trainer.train(resume_from_checkpoint=last_checkpoint)
-
-            eval_results = trainer.evaluate()
-
+            eval_results = self.best_eval_accuracy
             print(f"Evaluation results: {eval_results}")
 
-            if eval_results['eval_accuracy'] > best_score:
-                best_score = eval_results['eval_accuracy']
+            if eval_results > best_score:
+                best_score = eval_results
                 best_params = params
 
-            # Mark this set of parameters as completed
             completed_trials.add(params_tuple)
             with open(completed_trials_file, 'w') as f:
                 json.dump(list(completed_trials), f)
 
         self.best_params = best_params
-
-        # Save the best parameters using json.dump
         with open(f'{self.output_dir}/best_hyperparameters.json', 'w') as f:
             json.dump(best_params, f, indent=4)
 
         print(f"Best parameters found: {best_params} with accuracy {best_score}")
         return best_params
 
-    def train(self):
-        if self.tune:
-            # Path to the best hyperparameters file
-            best_params_file = os.path.join(self.output_dir, 'best_hyperparameters.json')
+    def train_epoch(self, model, train_loader, optimizer, loss_fn, scheduler=None):
+        model.train()
+        total_loss = 0
 
-            if os.path.exists(best_params_file):
-                # Load the best hyperparameters from the file if it exists
-                print("Loading best hyperparameters from file...")
-                with open(best_params_file, 'r') as f:
-                    self.best_params = json.load(f)
-            else:
-                # If the file doesn't exist, tune the hyperparameters
-                print("Tuning hyperparameters...")
-                self.tune_hyperparameters()
-        else:
-            # If not tuning, set default best_params
-            self.best_params = {
-                'learning_rate': 2e-5,
-                'num_train_epochs': 5,
-                'per_device_train_batch_size': 16,
-                'warmup_ratio': 0.1
-            }
+        for batch in train_loader:
+            optimizer.zero_grad()
 
-        batch_size = self.best_params['per_device_train_batch_size']
-        total_steps = len(self.train_dataset) // batch_size * self.best_params['num_train_epochs']
-        warmup_steps = int(self.best_params.get('warmup_ratio', 0.1) * total_steps)
+            input_ids = batch['input_ids'].to(self.device)
+            attention_mask = batch['attention_mask'].to(self.device)
+            labels = batch['labels'].to(self.device)
 
-        # Create a directory name that includes the chosen parameters
-        output_dir_name = (f"{self.output_dir}/training_lr{self.best_params['learning_rate']}_"
-                           f"epochs{self.best_params['num_train_epochs']}_"
-                           f"batch{self.best_params['per_device_train_batch_size']}_"
-                           f"warmup{self.best_params['warmup_ratio']}")
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
 
-        training_args = TrainingArguments(
-            output_dir=output_dir_name,
-            evaluation_strategy='epoch',  # Evaluate at the end of each epoch
-            save_strategy='epoch',  # Save a checkpoint at the end of each epoch
-            learning_rate=self.best_params['learning_rate'],
-            per_device_train_batch_size=batch_size,
-            per_device_eval_batch_size=batch_size,
-            num_train_epochs=self.best_params['num_train_epochs'],
-            weight_decay=0.01,
-            warmup_steps=warmup_steps,
-            logging_dir=f'{output_dir_name}/logs',
-            logging_strategy="epoch",
-            load_best_model_at_end=True,  # Load the best model at the end of training
-            metric_for_best_model="eval_accuracy",  # Specify the metric to use for selecting the best model
-            greater_is_better=True,  # Specify that higher metric values are better
-        )
+            loss = loss_fn(logits, labels)
+            loss.backward()
+            optimizer.step()
 
-        # Initialize early stopping callback
-        early_stopping = EarlyStoppingCallback(early_stopping_patience=3)
+            if scheduler:
+                scheduler.step()
 
-        train_loader, valid_loader, test_loader = self.create_data_loaders(batch_size)
+            total_loss += loss.item()
 
-        trainer = self.get_trainer(training_args, batch_size, total_steps, warmup_steps)
+        avg_loss = total_loss / len(train_loader)
+        return avg_loss
 
-        # Add the early stopping callback
-        trainer.add_callback(early_stopping)
-
-        # Train the model
-        print("Training the model...")
-        trainer.train()
-
-        # Save final model
-        trainer.save_model(f'{self.output_dir}/final_model')
-        self.classifier.tokenizer.save_pretrained(f'{self.output_dir}/final_model')
-
-        # Perform evaluation on test data
-        print("Evaluating the model on the test dataset...")
-        test_results = self.evaluate(test_loader)
-
-        # Save final evaluation results using json.dump
-        with open(f"{self.output_dir}/final_evaluation_results.json", "w") as f:
-            json.dump(test_results, f, indent=4)
-
-        print(f"Evaluation results on test dataset: {test_results}")
-        return test_results
-
-    def evaluate(self, data_loader):
-        self.classifier.model.eval()
+    def validate_epoch(self, model, valid_loader, loss_fn):
+        model.eval()
+        total_loss = 0
         all_logits = []
         all_labels = []
 
         with torch.no_grad():
-            for batch in data_loader:
+            for batch in valid_loader:
                 input_ids = batch['input_ids'].to(self.device)
                 attention_mask = batch['attention_mask'].to(self.device)
                 labels = batch['labels'].to(self.device)
+
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+                logits = outputs.logits
+
+                loss = loss_fn(logits, labels)
+                total_loss += loss.item()
+
+                all_logits.append(logits.cpu().numpy())
+                all_labels.append(labels.cpu().numpy())
+
+        avg_loss = total_loss / len(valid_loader)
+        all_logits = np.concatenate(all_logits, axis=0)
+        all_labels = np.concatenate(all_labels, axis=0)
+
+        metrics = self.compute_metrics(all_logits, all_labels)
+        return avg_loss, metrics
+
+    def train(self, epochs=5, batch_size=16, learning_rate=2e-5, warmup_steps=0, weight_decay=0.01):
+        output_dir_name = (f"{self.output_dir}/training_lr{learning_rate}_"
+                           f"epochs{epochs}_"
+                           f"batch{batch_size}_"
+                           f"warmup{warmup_steps}")
+
+        os.makedirs(output_dir_name, exist_ok=True)
+        logging_dir = f'{output_dir_name}/logs'
+        os.makedirs(logging_dir, exist_ok=True)
+
+        train_loader, valid_loader, _ = self.create_data_loaders(batch_size)
+
+        loss_fn = CrossEntropyLoss()
+
+        optimizer = Adam(self.classifier.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        scheduler = LambdaLR(optimizer,
+                             lr_lambda=lambda step: min((step + 1) / warmup_steps, 1)) if warmup_steps > 0 else None
+
+        no_improvement_epochs = 0
+
+        for epoch in range(epochs):
+            print(f"Epoch {epoch + 1}/{epochs}")
+
+            train_loss = self.train_epoch(self.classifier.model, train_loader, optimizer, loss_fn, scheduler)
+            valid_loss, metrics = self.validate_epoch(self.classifier.model, valid_loader, loss_fn)
+
+            print(f"Training Loss: {train_loss:.4f}, Validation Loss: {valid_loss:.4f}")
+            print(f"Validation Metrics: {metrics}")
+
+            eval_accuracy = metrics['eval_accuracy']
+            if eval_accuracy > self.best_eval_accuracy:
+                self.best_eval_accuracy = eval_accuracy
+                no_improvement_epochs = 0
+                self.save_checkpoint(epoch, self.classifier.model, optimizer, scheduler, eval_accuracy, output_dir_name)
+            else:
+                no_improvement_epochs += 1
+                if no_improvement_epochs >= self.early_stopping_patience:
+                    print("Early stopping triggered.")
+                    break
+
+    @staticmethod
+    def save_checkpoint(epoch, model, optimizer, scheduler, eval_accuracy, output_dir_name):
+        checkpoint_dir = os.path.join(output_dir_name, f"checkpoint_epoch_{epoch + 1}_acc_{eval_accuracy:.4f}")
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
+        checkpoint = {
+            'epoch': epoch + 1,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
+            'eval_accuracy': eval_accuracy
+        }
+
+        torch.save(checkpoint, os.path.join(checkpoint_dir, 'checkpoint.pth'))
+        print(f"Checkpoint saved to {checkpoint_dir}")
+
+    def predict_link(self, entity1, entity2, relation):
+        """
+        Predicts the likelihood that a link (relation) exists between two entities.
+
+        Args:
+            entity1 (str): The first entity.
+            entity2 (str): The second entity.
+            relation (str): The relation between entity1 and entity2.
+
+        Returns:
+            float: The probability that the link exists.
+        """
+        # Prepare the input text for BERT
+        input_text = f"{entity1} {relation} {entity2}"
+
+        # Tokenize the input text using the BERT tokenizer
+        inputs = self.classifier.tokenizer(input_text, return_tensors='pt', truncation=True, padding=True)
+
+        # Move inputs to the appropriate device
+        inputs = {key: value.to(self.device) for key, value in inputs.items()}
+
+        # Set the model to evaluation mode
+        self.classifier.model.eval()
+
+        # Perform the forward pass to get logits
+        with torch.no_grad():
+            outputs = self.classifier.model(**inputs)
+            logits = outputs.logits
+
+        # Apply softmax to get probabilities
+        probabilities = torch.softmax(logits, dim=-1).cpu().numpy()
+
+        # Assuming binary classification (link exists vs. link doesn't exist)
+        link_prob = probabilities[0][1]  # Probability of the link existing
+
+        return link_prob
+
+    def evaluate(self):
+        # Create a DataLoader for the test dataset
+        test_loader = DataLoader(self.test_dataset, batch_size=16, shuffle=False, collate_fn=WalkDataset.collate_fn)
+
+        # Get class weights for the loss function if needed (useful if using class weights during training)
+        class_weights = self.get_class_weights()
+        loss_fn = CrossEntropyLoss(weight=class_weights)
+
+        # Set the model to evaluation mode
+        self.classifier.model.eval()
+
+        # Initialize variables to accumulate loss and predictions
+        total_loss = 0
+        all_logits = []
+        all_labels = []
+
+        # Iterate over the test dataset
+        with torch.no_grad():
+            for batch in test_loader:
+                input_ids = batch['input_ids'].to(self.device)
+                attention_mask = batch['attention_mask'].to(self.device)
+                labels = batch['labels'].to(self.device)
+
+                # Get the model's predictions
                 outputs = self.classifier.model(input_ids=input_ids, attention_mask=attention_mask)
                 logits = outputs.logits
 
-                all_logits.append(logits.cpu())
-                all_labels.append(labels.cpu())
+                # Compute the loss
+                loss = loss_fn(logits, labels)
+                total_loss += loss.item()
 
-        all_logits = torch.cat(all_logits, dim=0)
-        all_labels = torch.cat(all_labels, dim=0)
+                # Collect the logits and labels for metric computation
+                all_logits.append(logits.cpu().numpy())
+                all_labels.append(labels.cpu().numpy())
 
-        metrics = self.compute_metrics((all_logits, all_labels))
-        return metrics
+        # Compute the average loss over the test dataset
+        avg_loss = total_loss / len(test_loader)
+
+        # Concatenate all predictions and labels
+        all_logits = np.concatenate(all_logits, axis=0)
+        all_labels = np.concatenate(all_labels, axis=0)
+
+        # Compute evaluation metrics
+        test_metrics = self.compute_metrics(all_logits, all_labels)
+        test_metrics["test_loss"] = avg_loss  # Optionally add the average loss to the metrics
+
+        # Print the test metrics
+        print(f"Test Metrics: {test_metrics}")
+
+        # Save the final evaluation results to a JSON file
+        final_results_path = os.path.join(self.output_dir, "final_evaluation_results.json")
+        with open(final_results_path, "w") as f:
+            json.dump(test_metrics, f, indent=4)
+        print(f"Evaluation results saved to {final_results_path}")
+
+        return test_metrics
+
+    def run(self):
+        if self.tune:
+            best_params = self.tune_hyperparameters()
+            print(f"Best hyperparameters: {best_params}")
+        else:
+            self.train()
+        self.evaluate()
