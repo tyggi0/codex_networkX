@@ -9,9 +9,10 @@ class Graph:
     def create_labeled_graph(self, triples):
         G = nx.DiGraph()
         for head, relation, tail in triples.values:
-            head_label = self.codex.entity_label(head)
-            relation_label = self.codex.relation_label(relation)
-            tail_label = self.codex.entity_label(tail)
+            head_label = f"{self.codex.entity_label(head)}: {self.codex.entity_description(head)}"
+            relation_label = f"{self.codex.relation_label(relation)}: {self.codex.relation_description(relation)}"
+            tail_label = f"{self.codex.entity_label(tail)}: {self.codex.entity_description(tail)}"
+
             G.add_edge(head_label, tail_label, key=relation_label)
             # Solve no neighbour problem, add reverse relation
             G.add_edge(tail_label, head_label, key=f"REVERSE {relation_label}")

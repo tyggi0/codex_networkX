@@ -82,13 +82,6 @@ class DataPreparation:
         train_invalid_walks = self.generator.generate_invalid_random_walks(
             self.transform_triples(invalid_triples_sampled))
 
-        print("\nTrain Walks:")
-        # Print first 10 valid and invalid walks
-        for i, walk in enumerate(train_valid_walks[:10]):
-            print(f"Valid Walk {i + 1}: {walk}")
-        for i, walk in enumerate(train_invalid_walks[:10]):
-            print(f"Invalid Walk {i + 1}: {walk}")
-
         print("\nEncoded Train Walks:")
         train_walks, train_labels = self.encode_data(train_valid_walks, train_invalid_walks)
 
