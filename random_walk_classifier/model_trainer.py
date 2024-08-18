@@ -3,7 +3,7 @@ import os
 import random
 import numpy as np
 import torch
-from torch.optim import Adam
+from torch.optim import Adam, SGD
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, confusion_matrix
@@ -161,10 +161,11 @@ class ModelTrainer:
         metrics = self.compute_metrics(all_logits, all_labels)
         return avg_loss, metrics
 
-    def train(self, epochs=5, batch_size=16, learning_rate=2e-5, warmup_steps=0, weight_decay=0.01):
+    def train(self, epochs=5, batch_size=16, learning_rate=0.01, momentum=0.9, warmup_steps=0, weight_decay=0.01):
         output_dir_name = (f"{self.output_dir}/training_lr{learning_rate}_"
                            f"epochs{epochs}_"
                            f"batch{batch_size}_"
+                           f"momentum{momentum}_"
                            f"warmup{warmup_steps}")
 
         os.makedirs(output_dir_name, exist_ok=True)
@@ -175,7 +176,9 @@ class ModelTrainer:
 
         loss_fn = CrossEntropyLoss()
 
-        optimizer = Adam(self.classifier.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        # Use SGD with Momentum
+        optimizer = SGD(self.classifier.model.parameters(), lr=learning_rate, momentum=momentum,
+                        weight_decay=weight_decay)
         scheduler = LambdaLR(optimizer,
                              lr_lambda=lambda step: min((step + 1) / warmup_steps, 1)) if warmup_steps > 0 else None
 
@@ -205,12 +208,13 @@ class ModelTrainer:
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self.classifier.model.load_state_dict(checkpoint['model_state_dict'])
 
-        # Re-create the optimizer
-        optimizer = Adam(self.classifier.model.parameters(),
-                         lr=checkpoint['optimizer_state_dict']['param_groups'][0]['lr'])
+        # Re-create the optimizer with SGD
+        optimizer = SGD(self.classifier.model.parameters(),
+                        lr=checkpoint['optimizer_state_dict']['param_groups'][0]['lr'],
+                        momentum=checkpoint['optimizer_state_dict']['param_groups'][0]['momentum'],
+                        weight_decay=checkpoint['optimizer_state_dict']['param_groups'][0]['weight_decay'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        # Re-create the scheduler with the correct lr_lambda
         def lr_lambda(current_step):
             if current_step < warmup_steps:
                 return float(current_step) / float(max(1, warmup_steps))
@@ -299,7 +303,7 @@ class ModelTrainer:
 
                 # Get the model's predictions
                 outputs = self.classifier.model(input_ids=input_ids, attention_mask=attention_mask)
-                logits = outputs.logits
+                logits = outputs
 
                 # Compute the loss
                 loss = CrossEntropyLoss(logits, labels)
