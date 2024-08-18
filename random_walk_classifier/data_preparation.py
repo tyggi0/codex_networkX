@@ -76,17 +76,21 @@ class DataPreparation:
         # Load the Codex train split
         train_triples = self.codex.split("train")
 
-        # Assume equal proportions for valid and invalid walks for simplicity
-        total_size = len(train_triples)
-        sample_size = total_size // 4  # Each category gets half of half (half the dataset, equally split)
+        # Step 1: Reduce the dataset to half of its original size
+        reduced_size = len(train_triples) // 2
+        reduced_triples = train_triples.sample(n=reduced_size)
 
-        # Sampling for valid walks
-        valid_triples_sampled = train_triples.sample(n=sample_size)
+        # Step 2: Ensure 75% of the reduced dataset consists of valid triples
+        valid_sample_size = int(reduced_size * 0.75)
+        invalid_sample_size = reduced_size - valid_sample_size
+
+        # Sampling for valid walks (75% of the reduced dataset)
+        valid_triples_sampled = reduced_triples.sample(n=valid_sample_size)
         train_valid_walks = self.transform_triples(valid_triples_sampled)
 
-        # Corrupt equivalent amount for invalid walks, ensuring stratified sampling
-        remaining_triples = train_triples.drop(valid_triples_sampled.index)
-        invalid_triples_sampled = remaining_triples.sample(n=sample_size)
+        # Corrupt the remaining triples to create invalid walks
+        remaining_triples = reduced_triples.drop(valid_triples_sampled.index)
+        invalid_triples_sampled = remaining_triples.sample(n=invalid_sample_size)
         train_invalid_walks = self.generator.generate_invalid_random_walks(
             self.transform_triples(invalid_triples_sampled))
 
