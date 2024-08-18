@@ -190,7 +190,7 @@ class ModelTrainer:
         scheduler = LambdaLR(optimizer,
                              lr_lambda=lambda step: min((step + 1) / warmup_steps, 1)) if warmup_steps > 0 else None
 
-        no_improvement_epochs = 0
+        # no_improvement_epochs = 0
 
         for epoch in range(epochs):
             logger.info(f"Epoch {epoch + 1}/{epochs}")
@@ -204,13 +204,13 @@ class ModelTrainer:
             eval_accuracy = metrics['eval_accuracy']
             if eval_accuracy > self.best_eval_accuracy:
                 self.best_eval_accuracy = eval_accuracy
-                no_improvement_epochs = 0
+                # no_improvement_epochs = 0
                 self.save_checkpoint(epoch, self.classifier.model, optimizer, scheduler, eval_accuracy, output_dir_name)
-            else:
-                no_improvement_epochs += 1
-                if no_improvement_epochs >= self.early_stopping_patience:
-                    logger.info("Early stopping triggered.")
-                    break
+            # else:
+                # no_improvement_epochs += 1
+                # if no_improvement_epochs >= self.early_stopping_patience:
+                #     logger.info("Early stopping triggered.")
+                #     break
 
     def load_checkpoint(self, checkpoint_path, warmup_steps, total_steps):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
