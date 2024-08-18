@@ -1,4 +1,12 @@
+import re
+
 from walk_dataset import WalkDataset
+
+
+def clean_description(description):
+    # Remove anything in parentheses that follows "Property:"
+    cleaned = re.sub(r'\s*\(Property:[^)]*\)', '', description)
+    return cleaned
 
 
 class DataPreparation:
@@ -10,9 +18,9 @@ class DataPreparation:
     def transform_triples(self, triples):
         transformed = []
         for head, relation, tail in triples.values:
-            head_label = f"{self.codex.entity_label(head)}: {self.codex.entity_description(head)}"
-            relation_label = f"{self.codex.relation_label(relation)}: {self.codex.relation_description(relation)}"
-            tail_label = f"{self.codex.entity_label(tail)}: {self.codex.entity_description(tail)}"
+            head_label = f"{self.codex.entity_label(head)}: {clean_description(self.codex.entity_description(head))}"
+            relation_label = f"{self.codex.relation_label(relation)}: {clean_description(self.codex.relation_description(relation))}"
+            tail_label = f"{self.codex.entity_label(tail)}: {clean_description(self.codex.entity_description(tail))}"
             transformed.append([head_label, relation_label, tail_label])
         return transformed
 

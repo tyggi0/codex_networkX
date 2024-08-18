@@ -3,6 +3,7 @@ import os
 import random
 
 import torch
+import torch.nn as nn
 from transformers import BertTokenizer, BertForSequenceClassification
 
 from codex.codex import Codex
@@ -12,11 +13,26 @@ from data_preparation import DataPreparation
 from model_trainer import ModelTrainer
 
 
-class RandomWalkClassifier:
-    def __init__(self, device):
+class RandomWalkClassifier(nn.Module):
+    def __init__(self, device, dropout_rate=0.1):
+        super(RandomWalkClassifier, self).__init__()
         self.device = device
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2).to(self.device)
+        self.dropout = nn.Dropout(dropout_rate)  # Dropout layer
+        self.classifier = nn.Linear(self.model.config.hidden_size, 2)
+
+    def forward(self, input_ids, attention_mask):
+        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+        pooled_output = outputs.pooler_output
+
+        # Apply dropout
+        dropped_output = self.dropout(pooled_output)
+
+        # Final classification
+        logits = self.classifier(dropped_output)
+        return logits
+
 
     def predict(self, input_walks):
         self.model.eval()

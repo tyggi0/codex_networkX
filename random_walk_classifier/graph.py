@@ -1,5 +1,7 @@
 import networkx as nx
 
+from data_preparation import clean_description
+
 
 class Graph:
     def __init__(self, codex):
@@ -9,9 +11,9 @@ class Graph:
     def create_labeled_graph(self, triples):
         G = nx.DiGraph()
         for head, relation, tail in triples.values:
-            head_label = f"{self.codex.entity_label(head)}: {self.codex.entity_description(head)}"
-            relation_label = f"{self.codex.relation_label(relation)}: {self.codex.relation_description(relation)}"
-            tail_label = f"{self.codex.entity_label(tail)}: {self.codex.entity_description(tail)}"
+            head_label = f"{self.codex.entity_label(head)}: {clean_description(self.codex.entity_description(head))}"
+            relation_label = f"{self.codex.relation_label(relation)}: {clean_description(self.codex.relation_description(relation))}"
+            tail_label = f"{self.codex.entity_label(tail)}: {clean_description(self.codex.entity_description(tail))}"
 
             G.add_edge(head_label, tail_label, key=relation_label)
             # Solve no neighbour problem, add reverse relation

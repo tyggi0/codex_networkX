@@ -3,7 +3,6 @@ import os
 import random
 import numpy as np
 import torch
-from sklearn.utils import compute_class_weight
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
