@@ -119,7 +119,7 @@ class ModelTrainer:
             labels = batch['labels'].to(self.device)
 
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-            logits = outputs.logits
+            logits = outputs
 
             loss = loss_fn(logits, labels)
             loss.backward()
@@ -146,7 +146,7 @@ class ModelTrainer:
                 labels = batch['labels'].to(self.device)
 
                 outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-                logits = outputs.logits
+                logits = outputs
 
                 loss = loss_fn(logits, labels)
                 total_loss += loss.item()
