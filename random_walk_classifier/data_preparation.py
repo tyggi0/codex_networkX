@@ -82,7 +82,7 @@ class DataPreparation:
 
         # Assume equal proportions for valid and invalid walks for simplicity
         total_size = len(train_triples)
-        sample_size = total_size // 2  # Each category gets half of half (half the dataset, equally split)
+        sample_size = total_size // 4  # Each category gets half of half (half the dataset, equally split)
 
         # Sampling for valid walks
         valid_triples_sampled = train_triples.sample(n=sample_size)
