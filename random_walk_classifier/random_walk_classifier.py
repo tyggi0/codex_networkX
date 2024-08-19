@@ -82,7 +82,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_di
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Random Walk Classifier')
     parser.add_argument('--random_walk', type=str, default=None,
-                        help='Name of the random walk strategy (Traditional, ERGRW, ERGRW_Adapted), optional')
+                        help='Name of the random walk strategy (Traditional, ERGRW, Adapted_ERGRW), optional')
     parser.add_argument('--tune', action='store_true', help='Flag to tune hyperparameters')
     parser.add_argument('--alpha', type=float, default=0.5, help='Alpha parameter for the ERGRW random walk generator')
     parser.add_argument('--num_walks', type=int, default=3000, help='Number of valid walks to generate')
