@@ -34,20 +34,6 @@ class RandomWalkClassifier(nn.Module):
         return logits
 
 
-    def predict(self, input_walks):
-        self.model.eval()
-        encoded_walks = [' '.join(map(str, walk)) for walk in input_walks]
-        inputs = self.tokenizer(encoded_walks, return_tensors='pt', padding=True, truncation=True, max_length=512).to(
-            self.device)
-
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            logits = outputs.logits
-            predictions = torch.argmax(logits, dim=-1).cpu().numpy()
-
-        return predictions
-
-
 def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_dir):
     tune_str = "tune_" if tune else ""
     # batch_str = f"_batch{batch_size}" if not tune else ""
@@ -89,7 +75,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_di
                                                   .prepare_datasets(random_walk_name, alpha, num_walks, walk_length))
 
     # Train and Evaluate Model
-    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device)
+    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device, 0.65)
     model_trainer.run()
 
 

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class ModelTrainer:
-    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device):
+    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device, threshold=0.5):
         self.output_dir = output_dir
         self.tune = tune
         self.classifier = classifier
@@ -30,11 +30,11 @@ class ModelTrainer:
         self.best_params = None
         self.best_eval_accuracy = 0.0
         self.early_stopping_patience = 3  # Define early stopping patience
+        self.threshold = threshold  # Decision threshold
 
-    @staticmethod
-    def compute_metrics(logits, labels):
-        predictions = np.argmax(logits, axis=-1)
+    def compute_metrics(self, logits, labels):
         probabilities = torch.softmax(torch.tensor(logits), dim=-1).numpy()[:, 1]
+        predictions = (probabilities >= self.threshold).astype(int)
 
         eval_accuracy = accuracy_score(labels, predictions)
         roc_auc = roc_auc_score(labels, probabilities)
