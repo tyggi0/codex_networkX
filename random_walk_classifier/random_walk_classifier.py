@@ -75,7 +75,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_di
                                                   .prepare_datasets(random_walk_name, alpha, num_walks, walk_length))
 
     # Train and Evaluate Model
-    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device, 0.65)
+    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device)
     model_trainer.run()
 
 
