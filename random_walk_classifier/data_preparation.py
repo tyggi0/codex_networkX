@@ -69,14 +69,8 @@ class DataPreparation:
 
         elif self.encoding_format == "bert":
             for walk in walks:
-                encoded_walk = ["[CLS]"]  # Start with [CLS] token
-
-                for element in walk:
-                    encoded_walk.append(element)
-                encoded_walk.append("[SEP]")  # End with [SEP] token
-
                 # Join the parts into a single string for BERT input
-                encoded_walks.append(' '.join(encoded_walk))
+                encoded_walks.append(' '.join(walk))
 
         else:
             raise ValueError("Unknown format specified. Supported formats are 'tag' and 'bert'.")
