@@ -1,5 +1,6 @@
 import re
 import logging
+
 from walk_dataset import WalkDataset
 
 # Set up logging
@@ -7,50 +8,78 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def clean_description(description):
-    # Remove anything in parentheses that follows "Property:"
-    cleaned = re.sub(r'\s*\(Property:[^)]*\)', '', description)
-    return cleaned
+def create_textual_representation(codex, head, relation, tail, description, lowercase):
+    def clean_description(text):
+        # Remove anything in parentheses that follows "Property:"
+        cleaned = re.sub(r'\s*\(Property:[^)]*\)', '', text)
+        return cleaned
+
+    head_label = f"{codex.entity_label(head)}: {clean_description(codex.entity_description(head))}" if description \
+        else f"{codex.entity_label(head)}"
+    relation_label = f"{codex.relation_label(relation)}: {clean_description(codex.relation_description(relation))}" \
+        if description else f"{codex.relation_label(relation)}"
+    tail_label = f"{codex.entity_label(tail)}: {clean_description(codex.entity_description(tail))}" \
+        if description else f"{codex.entity_label(tail)}"
+
+    # Convert to lowercase if the option is enabled
+    if lowercase:
+        head_label = head_label.lower()
+        relation_label = relation_label.lower()
+        tail_label = tail_label.lower()
+
+    return head_label, relation_label, tail_label
 
 
 class DataPreparation:
-    def __init__(self, generator, classifier, codex):
+    def __init__(self, generator, classifier, codex, description, encoding_format):
         self.generator = generator
         self.classifier = classifier
         self.codex = codex
+        self.description = description
+        self.encoding_format = encoding_format  # The format in which to encode the walks. Options are "tag" and "bert".
 
     def transform_triples(self, triples):
         transformed = []
         for head, relation, tail in triples.values:
-            head_label = f"{self.codex.entity_label(head)}: {clean_description(self.codex.entity_description(head))}"
-            relation_label = f"{self.codex.relation_label(relation)}: {clean_description(self.codex.relation_description(relation))}"
-            tail_label = f"{self.codex.entity_label(tail)}: {clean_description(self.codex.entity_description(tail))}"
-            transformed.append([head_label, relation_label, tail_label])
+            transformed.append([create_textual_representation(self.codex, head, relation, tail, self.description)])
         return transformed
 
-    @staticmethod
-    def encode_walks(walks):
+    def encode_walks(self, walks):
         """
-        Encode walks into a format suitable for BERT input, including both labels and descriptions.
+        Encode walks into a format suitable for BERT input.
 
         Args:
             walks (list of lists): A list of walks, where each walk is a sequence of alternating entities and relations.
-
         Returns:
             list of str: A list of encoded strings, one for each walk.
         """
         encoded_walks = []
 
-        for walk in walks:
-            encoded_walk = []
-            for i, element in enumerate(walk):
-                if i % 2 == 0:  # Even index: Entity
-                    encoded_walk.append(f"[ENTITY{i // 2 + 1}] {element} [/ENTITY{i // 2 + 1}]")
-                else:  # Odd index: Relation
-                    encoded_walk.append(f"[RELATION{i // 2 + 1}] {element} [/RELATION{i // 2 + 1}]")
+        if self.encoding_format == "tag":
+            for walk in walks:
+                encoded_walk = []
+                for i, element in enumerate(walk):
+                    if i % 2 == 0:  # Even index: Entity
+                        encoded_walk.append(f"[ENTITY{i // 2 + 1}] {element} [/ENTITY{i // 2 + 1}]")
+                    else:  # Odd index: Relation
+                        encoded_walk.append(f"[RELATION{i // 2 + 1}] {element} [/RELATION{i // 2 + 1}]")
 
-            # Join the parts into a single string for BERT input
-            encoded_walks.append(' '.join(encoded_walk))
+                # Join the parts into a single string for BERT input
+                encoded_walks.append(' '.join(encoded_walk))
+
+        elif self.encoding_format == "bert":
+            for walk in walks:
+                encoded_walk = ["[CLS]"]  # Start with [CLS] token
+
+                for element in walk:
+                    encoded_walk.append(element)
+                encoded_walk.append("[SEP]")  # End with [SEP] token
+
+                # Join the parts into a single string for BERT input
+                encoded_walks.append(' '.join(encoded_walk))
+
+        else:
+            raise ValueError("Unknown format specified. Supported formats are 'tag' and 'bert'.")
 
         return encoded_walks
 
@@ -76,13 +105,18 @@ class DataPreparation:
 
         return walks, labels
 
-    def prepare_train_dataset(self, random_walk_strategy, alpha, num_walks, walk_length):
+    def prepare_train_dataset(self, random_walk_strategy, alpha, num_walks, walk_length, size):
         # Load the Codex train split
         train_triples = self.codex.split("train")
 
         # Assume equal proportions for valid and invalid walks for simplicity
         total_size = len(train_triples)
-        sample_size = total_size // 2  # Each category gets half of half (half the dataset, equally split)
+        if size == "full":
+            sample_size = total_size // 2
+        elif size == "half":
+            sample_size = total_size // 4 # Each category gets half of half (half the dataset, equally split)
+        else:
+            raise ValueError("Unknown size specified. Supported sizes are 'full' and 'half'.")
 
         # Sampling for valid walks
         valid_triples_sampled = train_triples.sample(n=sample_size)
@@ -130,11 +164,11 @@ class DataPreparation:
         dataset = WalkDataset(walks, labels, self.classifier.tokenizer)
         return dataset
 
-    def prepare_datasets(self, random_walk_strategy, alpha, num_walks, walk_length):
+    def prepare_datasets(self, random_walk_strategy, alpha, num_walks, walk_length, size):
         logger.info("Preparing datasets...")
 
         # Prepare training dataset from the graph
-        train_dataset = self.prepare_train_dataset(random_walk_strategy, alpha, num_walks, walk_length)
+        train_dataset = self.prepare_train_dataset(random_walk_strategy, alpha, num_walks, walk_length, size)
 
         # Prepare validation dataset from Codex splits
         valid_dataset = self.prepare_eval_dataset("valid")

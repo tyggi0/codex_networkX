@@ -34,35 +34,43 @@ class RandomWalkClassifier(nn.Module):
         return logits
 
 
-def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_dir):
+def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, description, lowercase,
+                      encoding_format, size, parent_output_dir):
     tune_str = "tune_" if tune else ""
-    # batch_str = f"_batch{batch_size}" if not tune else ""
     alpha_str = f"_alpha{alpha}" if random_walk_name and random_walk_name != "traditional" else ""
     random_walk_name_str = f"{random_walk_name}" if random_walk_name else "codex"
+    description_str = "_description" if description else ""
+    lowercase_str = "_lowercase" if lowercase else ""
+    size_str = f"_{size}size" if size else ""
 
-    output_dir = os.path.join(parent_output_dir,
-                              f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}")
+    output_dir = os.path.join(
+        parent_output_dir,
+        f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}{description_str}{lowercase_str}{encoding_format}{size_str}")
 
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
 
-def main(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_dir):
+def main(random_walk_name, tune, alpha, num_walks, walk_length, description, lowercase, encoding_format, size,
+         parent_output_dir):
     random.seed(34)
 
     random_walk_name = random_walk_name.lower() if random_walk_name else ""
+    encoding_format = encoding_format.lower() if encoding_format else ""
+    size = size.lower() if size else ""
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create output directory based on hyperparameters
-    output_dir = create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_dir)
+    output_dir = create_output_dir(random_walk_name, tune, alpha, num_walks,
+                                   walk_length, description, lowercase, encoding_format, size, parent_output_dir)
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
 
     # Initialize and load the Graph
-    graph = Graph(codex).load_graph()
+    graph = Graph(codex).load_graph(description)
 
     # Initialize classifier
     classifier = RandomWalkClassifier(device=device)
@@ -71,8 +79,9 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, parent_output_di
     generator = RandomWalkGenerator(graph)
 
     # Prepare datasets
-    train_dataset, valid_dataset, test_dataset = (DataPreparation(generator, classifier, codex)
-                                                  .prepare_datasets(random_walk_name, alpha, num_walks, walk_length))
+    train_dataset, valid_dataset, test_dataset = (
+        DataPreparation(generator, classifier, codex, description, encoding_format)
+        .prepare_datasets(random_walk_name, alpha, num_walks, walk_length, size))
 
     # Train and Evaluate Model
     model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device)
@@ -87,7 +96,13 @@ if __name__ == "__main__":
     parser.add_argument('--alpha', type=float, default=0.5, help='Alpha parameter for the ERGRW random walk generator')
     parser.add_argument('--num_walks', type=int, default=3000, help='Number of valid walks to generate')
     parser.add_argument('--walk_length', type=int, default=6, help='Length of each walk')
-    # parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loading')
+    parser.add_argument('--description', action='store_true',
+                        help='Flag to include description for data textual representation')
+    parser.add_argument('--lowercase', action='store_true', help='Flag to convert train data to lowercase')
+    parser.add_argument('--encoding_format', type=str, default="bert",
+                        help='Name of the encoding format (BERT or Tag)')
+    parser.add_argument('--size', type=str, default="half", help='Train dataset size (full or half)')
+
     parser.add_argument('--parent_output_dir', type=str,
                         default="/content/drive/MyDrive/codex_random_walk", help='Directory to save the results')
     args = parser.parse_args()
@@ -95,5 +110,6 @@ if __name__ == "__main__":
     main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.parent_output_dir)
     # Running script:
     # python random_walk_classifier/random_walk_classifier.py
-    #       --random_walk Traditional --tune --alpha 0.6 --num_walks 5000 --walk_length 8 --batch_size 16
+    #       --random_walk Traditional --tune --alpha 0.6 --num_walks 5000 --walk_length 8
+    #       --description --lowercase --encoding_format bert --size half
     #       --parent_output_dir /content/drive/MyDrive/codex_random_walk

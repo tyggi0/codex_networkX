@@ -1,6 +1,6 @@
 import networkx as nx
 
-from data_preparation import clean_description
+from data_preparation import create_textual_representation
 
 
 class Graph:
@@ -8,19 +8,16 @@ class Graph:
         self.codex = codex
         self.train_graph = None
 
-    def create_labeled_graph(self, triples):
+    def create_labeled_graph(self, triples, description):
         G = nx.DiGraph()
         for head, relation, tail in triples.values:
-            head_label = f"{self.codex.entity_label(head)}: {clean_description(self.codex.entity_description(head))}"
-            relation_label = f"{self.codex.relation_label(relation)}: {clean_description(self.codex.relation_description(relation))}"
-            tail_label = f"{self.codex.entity_label(tail)}: {clean_description(self.codex.entity_description(tail))}"
-
+            head_label, relation_label, tail_label = create_textual_representation(self.codex, head, relation, tail, description)
             G.add_edge(head_label, tail_label, key=relation_label)
             # Solve no neighbour problem, add reverse relation
             G.add_edge(tail_label, head_label, key=f"REVERSE {relation_label}")
         return G
 
-    def load_graph(self):
+    def load_graph(self, description):
         train_triples = self.codex.split("train")
 
         # Print details about the splits
@@ -28,7 +25,7 @@ class Graph:
         print(f"Number of triples: {len(train_triples)}")
         print(f"Head of triples:\n{train_triples.head()}\n")
 
-        self.train_graph = self.create_labeled_graph(train_triples)
+        self.train_graph = self.create_labeled_graph(train_triples, description)
 
         return self.train_graph
 
