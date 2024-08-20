@@ -31,17 +31,19 @@ def create_textual_representation(codex, head, relation, tail, description, lowe
 
 
 class DataPreparation:
-    def __init__(self, generator, classifier, codex, description, encoding_format):
+    def __init__(self, generator, classifier, codex, description, encoding_format, lowercase):
         self.generator = generator
         self.classifier = classifier
         self.codex = codex
         self.description = description
         self.encoding_format = encoding_format  # The format in which to encode the walks. Options are "tag" and "bert".
+        self.lowercase = lowercase
 
     def transform_triples(self, triples):
         transformed = []
         for head, relation, tail in triples.values:
-            transformed.append([create_textual_representation(self.codex, head, relation, tail, self.description)])
+            transformed.append(list(create_textual_representation(self.codex, head, relation, tail,
+                                                                  self.description, self.lowercase)))
         return transformed
 
     def encode_walks(self, walks):
@@ -69,8 +71,15 @@ class DataPreparation:
 
         elif self.encoding_format == "bert":
             for walk in walks:
+                encoded_walk = []
+
+                for i, element in enumerate(walk):
+                    encoded_walk.append(element)
+                    if i < len(walk) - 1:  # Check if it's not the last element
+                        encoded_walk.append("[SEP]")  # Add [SEP] only between elements
+
                 # Join the parts into a single string for BERT input
-                encoded_walks.append(' '.join(walk))
+                encoded_walks.append(' '.join(encoded_walk))
 
         else:
             raise ValueError("Unknown format specified. Supported formats are 'tag' and 'bert'.")
@@ -108,7 +117,7 @@ class DataPreparation:
         if size == "full":
             sample_size = total_size // 2
         elif size == "half":
-            sample_size = total_size // 4 # Each category gets half of half (half the dataset, equally split)
+            sample_size = total_size // 4  # Each category gets half of half (half the dataset, equally split)
         else:
             raise ValueError("Unknown size specified. Supported sizes are 'full' and 'half'.")
 
@@ -138,10 +147,16 @@ class DataPreparation:
             combined_labels = labels + train_labels
 
             dataset = WalkDataset(combined_walks, combined_labels, self.classifier.tokenizer)
+            logger.info(f"Creating WalkDataset with {len(combined_walks)} walks and {len(combined_labels)} labels.")
+            # Log the first item from the dataset
+            logger.info(f"First dataset item: {dataset[0]}")
 
         else:
             logger.info("No random walk strategy provided, using only Codex dataset.")
             dataset = WalkDataset(train_walks, train_labels, self.classifier.tokenizer)
+            logger.info(f"Creating WalkDataset with {len(train_walks)} walks and {len(train_labels)} labels.")
+            # Log the first item from the dataset
+            logger.info(f"First dataset item: {dataset[0]}")
 
         return dataset
 

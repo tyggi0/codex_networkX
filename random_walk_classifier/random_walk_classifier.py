@@ -73,7 +73,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, description, low
     codex = Codex(code="en", size="s")
 
     # Initialize and load the Graph
-    graph = Graph(codex).load_graph(description)
+    graph = Graph(codex, description, lowercase).load_graph()
 
     # Initialize classifier
     classifier = RandomWalkClassifier(device=device)
@@ -83,7 +83,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, description, low
 
     # Prepare datasets
     train_dataset, valid_dataset, test_dataset = (
-        DataPreparation(generator, classifier, codex, description, encoding_format)
+        DataPreparation(generator, classifier, codex, description, encoding_format, lowercase)
         .prepare_datasets(random_walk_name, alpha, num_walks, walk_length, size))
 
     # Train and Evaluate Model
@@ -113,7 +113,9 @@ if __name__ == "__main__":
                         default="/content/drive/MyDrive/codex_random_walk", help='Directory to save the results')
     args = parser.parse_args()
 
-    main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.parent_output_dir)
+    main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.description,
+         args.lowercase, args.encoding_format, args.size, args.optimizer, args.parent_output_dir)
+
     # Running script:
     # python random_walk_classifier/random_walk_classifier.py
     #       --random_walk Traditional --tune --alpha 0.6 --num_walks 5000 --walk_length 8
