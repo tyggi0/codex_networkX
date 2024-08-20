@@ -45,7 +45,8 @@ def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, des
 
     output_dir = os.path.join(
         parent_output_dir,
-        f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}{description_str}{lowercase_str}{encoding_format}{size_str}")
+        f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}"
+        f"{description_str}{lowercase_str}{encoding_format}{size_str}_{optimizer}")
 
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     parser.add_argument('--encoding_format', type=str, default="bert",
                         help='Name of the encoding format (BERT or Tag)')
     parser.add_argument('--size', type=str, default="half", help='Train dataset size (full or half)')
-    parser.add_argument('--optimizer_choice', type=str, default="bertadam",
+    parser.add_argument('--optimizer', type=str, default="bertadam",
                         help='Optimizer for hyperparameter tuning (BertAdam or SGD)')
 
     parser.add_argument('--parent_output_dir', type=str,
