@@ -11,6 +11,8 @@ from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
 import logging
 
+from transformers import AdamW
+
 from walk_dataset import WalkDataset
 
 # Set up logging
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class ModelTrainer:
-    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device, threshold=0.5):
+    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, optimizer_choice, device, threshold=0.5):
         self.output_dir = output_dir
         self.tune = tune
         self.classifier = classifier
@@ -30,6 +32,7 @@ class ModelTrainer:
         self.best_params = None
         self.best_eval_accuracy = 0.0
         self.early_stopping_patience = 3  # Define early stopping patience
+        self.optimizer_choice = optimizer_choice
         self.threshold = threshold  # Decision threshold
 
     def compute_metrics(self, logits, labels):
@@ -184,9 +187,15 @@ class ModelTrainer:
 
         loss_fn = CrossEntropyLoss()
 
-        # Use SGD with Momentum
-        optimizer = SGD(self.classifier.model.parameters(), lr=learning_rate, momentum=momentum,
-                        weight_decay=weight_decay)
+        # Choose the optimizer based on the optimizer_choice argument
+        if self.optimizer_choice == "bertadam":
+            optimizer = AdamW(self.classifier.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        elif self.optimizer_choice == "sgd":
+            optimizer = SGD(self.classifier.model.parameters(), lr=learning_rate, momentum=momentum,
+                            weight_decay=weight_decay)
+        else:
+            raise ValueError(f"Unsupported optimizer choice: {self.optimizer_choice}. Choose 'BertAdam' or 'SGD'.")
+
         scheduler = LambdaLR(optimizer,
                              lr_lambda=lambda step: min((step + 1) / warmup_steps, 1)) if warmup_steps > 0 else None
 

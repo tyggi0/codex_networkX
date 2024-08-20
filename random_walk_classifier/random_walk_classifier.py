@@ -35,7 +35,7 @@ class RandomWalkClassifier(nn.Module):
 
 
 def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, description, lowercase,
-                      encoding_format, size, parent_output_dir):
+                      encoding_format, size, optimizer, parent_output_dir):
     tune_str = "tune_" if tune else ""
     alpha_str = f"_alpha{alpha}" if random_walk_name and random_walk_name != "traditional" else ""
     random_walk_name_str = f"{random_walk_name}" if random_walk_name else "codex"
@@ -53,18 +53,20 @@ def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, des
 
 
 def main(random_walk_name, tune, alpha, num_walks, walk_length, description, lowercase, encoding_format, size,
-         parent_output_dir):
+         optimizer, parent_output_dir):
     random.seed(34)
 
     random_walk_name = random_walk_name.lower() if random_walk_name else ""
     encoding_format = encoding_format.lower() if encoding_format else ""
     size = size.lower() if size else ""
+    optimizer = optimizer.lower()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create output directory based on hyperparameters
     output_dir = create_output_dir(random_walk_name, tune, alpha, num_walks,
-                                   walk_length, description, lowercase, encoding_format, size, parent_output_dir)
+                                   walk_length, description, lowercase, encoding_format,
+                                   size, optimizer, parent_output_dir)
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
@@ -84,7 +86,8 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, description, low
         .prepare_datasets(random_walk_name, alpha, num_walks, walk_length, size))
 
     # Train and Evaluate Model
-    model_trainer = ModelTrainer(output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, device)
+    model_trainer = ModelTrainer(output_dir, classifier, tune,
+                                 train_dataset, valid_dataset, test_dataset, optimizer, device)
     model_trainer.run()
 
 
@@ -102,6 +105,8 @@ if __name__ == "__main__":
     parser.add_argument('--encoding_format', type=str, default="bert",
                         help='Name of the encoding format (BERT or Tag)')
     parser.add_argument('--size', type=str, default="half", help='Train dataset size (full or half)')
+    parser.add_argument('--optimizer_choice', type=str, default="bertadam",
+                        help='Optimizer for hyperparameter tuning (BertAdam or SGD)')
 
     parser.add_argument('--parent_output_dir', type=str,
                         default="/content/drive/MyDrive/codex_random_walk", help='Directory to save the results')
