@@ -46,7 +46,7 @@ def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, des
     output_dir = os.path.join(
         parent_output_dir,
         f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}"
-        f"{description_str}{lowercase_str}{encoding_format}{size_str}_{optimizer}")
+        f"{description_str}{lowercase_str}_{encoding_format}{size_str}_{optimizer}")
 
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
