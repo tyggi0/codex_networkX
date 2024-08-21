@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class ModelTrainer:
-    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, optimizer_choice, device, threshold=0.5):
+    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, optimizer_choice, early_drop, device, threshold=0.5):
         self.output_dir = output_dir
         self.tune = tune
         self.classifier = classifier
@@ -31,6 +31,7 @@ class ModelTrainer:
         self.device = device
         self.best_params = None
         self.best_eval_accuracy = 0.0
+        self.early_drop = early_drop
         self.early_stopping_patience = 3  # Define early stopping patience
         self.optimizer_choice = optimizer_choice
         self.threshold = threshold  # Decision threshold
@@ -199,7 +200,7 @@ class ModelTrainer:
         scheduler = LambdaLR(optimizer,
                              lr_lambda=lambda step: min((step + 1) / warmup_steps, 1)) if warmup_steps > 0 else None
 
-        # no_improvement_epochs = 0
+        no_improvement_epochs = 0
 
         for epoch in range(epochs):
             logger.info(f"Epoch {epoch + 1}/{epochs}")
@@ -215,11 +216,11 @@ class ModelTrainer:
                 self.best_eval_accuracy = eval_accuracy
                 # no_improvement_epochs = 0
                 self.save_checkpoint(epoch, self.classifier.model, optimizer, scheduler, eval_accuracy, output_dir_name)
-            # else:
-                # no_improvement_epochs += 1
-                # if no_improvement_epochs >= self.early_stopping_patience:
-                #     logger.info("Early stopping triggered.")
-                #     break
+            elif self.early_drop:
+                no_improvement_epochs += 1
+                if no_improvement_epochs >= self.early_stopping_patience:
+                    logger.info("Early stopping triggered.")
+                    break
 
     def load_checkpoint(self, checkpoint_path, warmup_steps, total_steps):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)

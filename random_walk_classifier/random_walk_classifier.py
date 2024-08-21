@@ -35,18 +35,19 @@ class RandomWalkClassifier(nn.Module):
 
 
 def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, description, lowercase,
-                      encoding_format, size, optimizer, parent_output_dir):
+                      encoding_format, size, optimizer, early_drop, parent_output_dir):
     tune_str = "tune_" if tune else ""
     alpha_str = f"_alpha{alpha}" if random_walk_name and random_walk_name != "traditional" else ""
     random_walk_name_str = f"{random_walk_name}" if random_walk_name else "codex"
     description_str = "_description" if description else ""
     lowercase_str = "_lowercase" if lowercase else ""
     size_str = f"_{size}size" if size else ""
+    early_drop_str = "_early_drop" if early_drop else ""
 
     output_dir = os.path.join(
         parent_output_dir,
         f"{tune_str}{random_walk_name_str}{alpha_str}_walks{num_walks}_length{walk_length}"
-        f"{description_str}{lowercase_str}_{encoding_format}{size_str}_{optimizer}")
+        f"{description_str}{lowercase_str}_{encoding_format}{size_str}_{optimizer}{early_drop_str}")
 
     print(f"Creating output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
@@ -54,7 +55,7 @@ def create_output_dir(random_walk_name, tune, alpha, num_walks, walk_length, des
 
 
 def main(random_walk_name, tune, alpha, num_walks, walk_length, description, lowercase, encoding_format, size,
-         optimizer, parent_output_dir):
+         optimizer, early_drop, parent_output_dir):
     random.seed(34)
 
     random_walk_name = random_walk_name.lower() if random_walk_name else ""
@@ -67,7 +68,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, description, low
     # Create output directory based on hyperparameters
     output_dir = create_output_dir(random_walk_name, tune, alpha, num_walks,
                                    walk_length, description, lowercase, encoding_format,
-                                   size, optimizer, parent_output_dir)
+                                   size, optimizer, early_drop, parent_output_dir)
 
     # Initialize Codex
     codex = Codex(code="en", size="s")
@@ -88,7 +89,7 @@ def main(random_walk_name, tune, alpha, num_walks, walk_length, description, low
 
     # Train and Evaluate Model
     model_trainer = ModelTrainer(output_dir, classifier, tune,
-                                 train_dataset, valid_dataset, test_dataset, optimizer, device)
+                                 train_dataset, valid_dataset, test_dataset, optimizer, early_drop, device)
     model_trainer.run()
 
 
@@ -108,13 +109,15 @@ if __name__ == "__main__":
     parser.add_argument('--size', type=str, default="half", help='Train dataset size (full or half)')
     parser.add_argument('--optimizer', type=str, default="bertadam",
                         help='Optimizer for hyperparameter tuning (BertAdam or SGD)')
+    parser.add_argument('--early_drop', action='store_true',
+                        help='Early drop while training')
 
     parser.add_argument('--parent_output_dir', type=str,
                         default="/content/drive/MyDrive/codex_random_walk", help='Directory to save the results')
     args = parser.parse_args()
 
     main(args.random_walk, args.tune, args.alpha, args.num_walks, args.walk_length, args.description,
-         args.lowercase, args.encoding_format, args.size, args.optimizer, args.parent_output_dir)
+         args.lowercase, args.encoding_format, args.size, args.optimizer, args.early_drop, args.parent_output_dir)
 
     # Running script:
     # python random_walk_classifier/random_walk_classifier.py
