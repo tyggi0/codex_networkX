@@ -63,7 +63,7 @@ class ModelTrainer:
 
     def tune_hyperparameters(self):
         param_distributions = {
-            'learning_rate': np.logspace(-5, -4, num=50),  # 1e-5 to 1e-4
+            'learning_rate': [5e-5, 4e-5, 3e-5, 2e-5],
             'num_train_epochs': [2, 3, 4] if self.optimizer_choice == "bertadam" else [3, 5, 7, 9],
             'per_device_train_batch_size': [16, 32],
             'warmup_ratio': [0.0, 0.1, 0.2],
