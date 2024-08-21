@@ -41,7 +41,7 @@ class ModelTrainer:
 
         eval_accuracy = accuracy_score(labels, predictions)
         roc_auc = roc_auc_score(labels, probabilities)
-        class_report = classification_report(labels, predictions, output_dict=True)
+        class_report = classification_report(labels, predictions, output_dict=True, zero_division=0)
         conf_matrix = confusion_matrix(labels, predictions)
 
         return {
