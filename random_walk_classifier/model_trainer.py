@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class ModelTrainer:
-    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, optimizer_choice, early_drop, device, threshold=0.5):
+    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, optimizer_choice,
+                 n_iterations, early_drop, device, threshold=0.5):
         self.output_dir = output_dir
         self.tune = tune
         self.classifier = classifier
@@ -31,6 +32,7 @@ class ModelTrainer:
         self.device = device
         self.best_params = None
         self.best_eval_accuracy = 0.0
+        self.n_iterations = n_iterations
         self.early_drop = early_drop
         self.early_stopping_patience = 3  # Define early stopping patience
         self.optimizer_choice = optimizer_choice
@@ -59,7 +61,7 @@ class ModelTrainer:
                                   collate_fn=WalkDataset.collate_fn)
         return train_loader, valid_loader
 
-    def tune_hyperparameters(self, n_iter=4):
+    def tune_hyperparameters(self):
         param_distributions = {
             'learning_rate': np.logspace(-5, -4, num=50),  # 1e-5 to 1e-4
             'num_train_epochs': [3, 5, 7, 9],
@@ -76,7 +78,7 @@ class ModelTrainer:
             with open(completed_trials_file, 'r') as f:
                 completed_trials = {tuple(tuple(pair) for pair in trial) for trial in json.load(f)}
 
-        for _ in range(n_iter):
+        for _ in range(self.n_iterations):
             params = {
                 'learning_rate': random.choice(param_distributions['learning_rate']),
                 'num_train_epochs': random.choice(param_distributions['num_train_epochs']),
