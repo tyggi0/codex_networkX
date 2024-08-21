@@ -112,8 +112,6 @@ if __name__ == "__main__":
     parser.add_argument('--size', type=str, default="half", help='Train dataset size (full or half)')
     parser.add_argument('--optimizer', type=str, default="bertadam",
                         help='Optimizer for hyperparameter tuning (BertAdam or SGD)')
-    parser.add_argument('--early_drop', action='store_true',
-                        help='Early drop while training')
     parser.add_argument('--n_iterations', type=int, default=5,
                         help='Specify the number of iterations to perform during hyperparameter tuning. ')
     parser.add_argument('--early_drop', action='store_true',
