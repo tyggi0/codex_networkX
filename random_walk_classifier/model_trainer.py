@@ -155,14 +155,16 @@ class ModelTrainer:
 
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             logits = outputs.logits
+            logger.info(f"Training logits: {logits}")
+
 
             if torch.isnan(logits).any():
-                logger.warning("NaN detected in logits during training")
+                logger.info("NaN detected in logits during training")
                 return None  # Return None to indicate failure
 
             loss = loss_fn(logits, labels)
             if torch.isnan(loss):
-                logger.warning("NaN detected in loss during training")
+                logger.info("NaN detected in loss during training")
                 return None  # Return None to indicate failure
 
             loss.backward()
