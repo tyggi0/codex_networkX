@@ -39,8 +39,27 @@ class ModelTrainer:
         self.threshold = threshold  # Decision threshold
 
     def compute_metrics(self, logits, labels):
+        if isinstance(logits, torch.Tensor):
+            logits = logits.detach().cpu().numpy()
+        if isinstance(labels, torch.Tensor):
+            labels = labels.detach().cpu().numpy()
+
+        # Print logits and labels to debug NaN issue
+        print(f"Logits before softmax: {logits}")
+        print(f"Labels: {labels}")
+
+        # Compute predictions
+        predictions = np.argmax(logits, axis=-1)
+        print(f"Predictions after argmax (axis=-1): {predictions}")
+
+        # Compute probabilities
         probabilities = torch.softmax(torch.tensor(logits), dim=-1).numpy()[:, 1]
-        predictions = (probabilities >= self.threshold).astype(int)
+        print(f"Probabilities after softmax (dim=-1): {probabilities}")
+
+        # Ensure no NaN values in probabilities
+        probabilities = np.nan_to_num(probabilities, nan=0.0)
+
+        # predictions = (probabilities >= self.threshold).astype(int)
 
         eval_accuracy = accuracy_score(labels, predictions)
         roc_auc = roc_auc_score(labels, probabilities)
