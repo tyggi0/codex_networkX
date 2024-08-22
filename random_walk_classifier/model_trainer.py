@@ -158,6 +158,16 @@ class ModelTrainer:
 
             loss = loss_fn(logits, labels)
             loss.backward()
+
+            # Add gradient clipping
+            torch.nn.utils.clip_grad_norm_(self.classifier.model.parameters(), max_norm=1.0)
+
+            # Check for NaNs in model parameters
+            for param in self.classifier.parameters():
+                if torch.isnan(param).any():
+                    print("NaN detected in model parameters")
+                    return  # Early exit if NaNs are detected
+
             optimizer.step()
 
             if scheduler:
