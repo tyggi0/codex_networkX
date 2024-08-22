@@ -86,10 +86,8 @@ class ModelTrainer:
             'num_train_epochs': [2, 3, 4] if self.optimizer_choice == "bertadam" else [3, 5, 7, 9],
             'per_device_train_batch_size': [16, 32],
             'warmup_ratio': [0.0, 0.1, 0.2],
+            'momentum': np.linspace(0.8, 0.99, num=20),
         }
-
-        if self.optimizer_choice == "sgd":
-            param_distributions['momentum'] = np.linspace(0.8, 0.99, num=20)
 
         best_params = None
         best_score = float('-inf')
@@ -106,10 +104,8 @@ class ModelTrainer:
                 'num_train_epochs': random.choice(param_distributions['num_train_epochs']),
                 'per_device_train_batch_size': random.choice(param_distributions['per_device_train_batch_size']),
                 'warmup_ratio': random.choice(param_distributions['warmup_ratio']),
+                'momentum': random.choice(param_distributions['momentum'])
             }
-
-            if self.optimizer_choice == "sgd":
-                params['momentum'] = random.choice(param_distributions['momentum'])
 
             params_tuple = tuple(params.items())
             if params_tuple in completed_trials:
@@ -122,16 +118,10 @@ class ModelTrainer:
 
             logger.info(f"Trying parameters: {params} with warmup_steps={warmup_steps}")
 
-            if self.optimizer_choice == "sgd":
-                self.train(epochs=params['num_train_epochs'],
+            self.train(epochs=params['num_train_epochs'],
                            batch_size=batch_size,
                            learning_rate=params['learning_rate'],
                            momentum=params['momentum'],
-                           warmup_steps=warmup_steps)
-            else:
-                self.train(epochs=params['num_train_epochs'],
-                           batch_size=batch_size,
-                           learning_rate=params['learning_rate'],
                            warmup_steps=warmup_steps)
 
             eval_results = self.best_eval_accuracy
