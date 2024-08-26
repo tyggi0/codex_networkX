@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class ModelTrainer:
-    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset, optimizer_choice,
-                 n_iterations, early_drop, device, threshold=0.5):
+    def __init__(self, output_dir, classifier, tune, train_dataset, valid_dataset, test_dataset,
+                 n_iterations, early_drop, device):
         self.output_dir = output_dir
         self.tune = tune
         self.classifier = classifier
@@ -35,8 +35,6 @@ class ModelTrainer:
         self.n_iterations = n_iterations
         self.early_drop = early_drop
         self.early_stopping_patience = 3  # Define early stopping patience
-        self.optimizer_choice = optimizer_choice
-        self.threshold = threshold  # Decision threshold
 
     def compute_metrics(self, logits, labels):
         if isinstance(logits, torch.Tensor):
@@ -52,9 +50,11 @@ class ModelTrainer:
         predictions = np.argmax(logits, axis=-1)
         logger.info(f"Predictions after argmax (axis=-1): {predictions}")
 
-        # Compute probabilities
-        probabilities = torch.softmax(torch.tensor(logits), dim=-1).numpy()[:, 1]
-        logger.info(f"Probabilities after softmax (dim=-1): {probabilities}")
+        # Compute probabilities: Add Small Epsilon to Logarithm
+        epsilon = 1e-10
+        softmax_output = torch.softmax(logits, dim=-1) + epsilon
+        probabilities = torch.log(softmax_output)
+        logger.info(f"Probabilities after softmax with epsilon (dim=-1): {probabilities}")
 
         # Ensure no NaN values in probabilities
         probabilities = np.nan_to_num(probabilities, nan=0.0)
@@ -82,7 +82,7 @@ class ModelTrainer:
 
     def tune_hyperparameters(self):
         param_distributions = {
-            'learning_rate': [5e-5, 4e-5, 3e-5, 2e-5],
+            'learning_rate': [5e-5, 4e-5, 3e-5, 2e-5, 1e-6],
             'num_train_epochs': [2, 3, 4] if self.optimizer_choice == "bertadam" else [3, 5, 7, 9],
             'per_device_train_batch_size': [16, 32],
             'warmup_ratio': [0.0, 0.1, 0.2],
@@ -104,7 +104,6 @@ class ModelTrainer:
                 'num_train_epochs': random.choice(param_distributions['num_train_epochs']),
                 'per_device_train_batch_size': random.choice(param_distributions['per_device_train_batch_size']),
                 'warmup_ratio': random.choice(param_distributions['warmup_ratio']),
-                'momentum': random.choice(param_distributions['momentum'])
             }
 
             params_tuple = tuple(params.items())
@@ -121,7 +120,6 @@ class ModelTrainer:
             self.train(epochs=params['num_train_epochs'],
                            batch_size=batch_size,
                            learning_rate=params['learning_rate'],
-                           momentum=params['momentum'],
                            warmup_steps=warmup_steps)
 
             eval_results = self.best_eval_accuracy
@@ -157,15 +155,14 @@ class ModelTrainer:
             logits = outputs.logits
             logger.info(f"Training logits: {logits}")
 
-
             if torch.isnan(logits).any():
                 logger.info("NaN detected in logits during training")
-                return None  # Return None to indicate failure
+                return float('inf')  # Return a large value instead of None to indicate failure
 
             loss = loss_fn(logits, labels)
-            if torch.isnan(loss):
+            if torch.isnan(loss).any():
                 logger.info("NaN detected in loss during training")
-                return None  # Return None to indicate failure
+                return float('inf')  # Return a large value instead of None to indicate failure
 
             loss.backward()
 
@@ -175,8 +172,8 @@ class ModelTrainer:
             # Check for NaNs in model parameters
             for param in self.classifier.parameters():
                 if torch.isnan(param).any():
-                    print("NaN detected in model parameters")
-                    return  # Early exit if NaNs are detected
+                    logger.info("NaN detected in model parameters")
+                    return float('inf')  # Return a large value instead of None to indicate failure
 
             optimizer.step()
 
@@ -205,12 +202,12 @@ class ModelTrainer:
 
                 if torch.isnan(logits).any():
                     logger.warning("NaN detected in logits during validation")
-                    return None, {}  # Return None to indicate failure
+                    return float('inf'), None  # Return a large loss and None for metrics
 
                 loss = loss_fn(logits, labels)
-                if torch.isnan(loss):
+                if torch.isnan(loss).any():
                     logger.warning("NaN detected in loss during validation")
-                    return None, {}  # Return None to indicate failure
+                    return float('inf'), None  # Return a large loss and None for metrics
 
                 total_loss += loss.item()
 
@@ -224,11 +221,10 @@ class ModelTrainer:
         metrics = self.compute_metrics(all_logits, all_labels)
         return avg_loss, metrics
 
-    def train(self, epochs=7, batch_size=16, learning_rate=0.0001, momentum=0.91, warmup_steps=0, weight_decay=0.01):
+    def train(self, epochs=7, batch_size=16, learning_rate=0.0001, warmup_steps=0, weight_decay=0.01):
         output_dir_name = (f"{self.output_dir}/training_lr{learning_rate}_"
                            f"epochs{epochs}_"
                            f"batch{batch_size}_"
-                           f"momentum{momentum}_" if self.optimizer_choice == "sgd" else ""
                            f"warmup{warmup_steps}")
 
         os.makedirs(output_dir_name, exist_ok=True)
@@ -239,14 +235,7 @@ class ModelTrainer:
 
         loss_fn = CrossEntropyLoss()
 
-        # Choose the optimizer based on the optimizer_choice argument
-        if self.optimizer_choice == "bertadam":
-            optimizer = AdamW(self.classifier.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        elif self.optimizer_choice == "sgd":
-            optimizer = SGD(self.classifier.model.parameters(), lr=learning_rate, momentum=momentum,
-                            weight_decay=weight_decay)
-        else:
-            raise ValueError(f"Unsupported optimizer choice: {self.optimizer_choice}. Choose 'BertAdam' or 'SGD'.")
+        optimizer = AdamW(self.classifier.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
         scheduler = LambdaLR(optimizer,
                              lr_lambda=lambda step: min((step + 1) / warmup_steps, 1)) if warmup_steps > 0 else None
@@ -259,7 +248,7 @@ class ModelTrainer:
             train_loss = self.train_epoch(self.classifier.model, train_loader, optimizer, loss_fn, scheduler)
             valid_loss, metrics = self.validate_epoch(self.classifier.model, valid_loader, loss_fn)
 
-            logger.info(f"Training Loss: {train_loss:.4f}, Validation Loss: {valid_loss:.4f}")
+            logger.info(f"Training Loss: {train_loss:.4f}, Validation Loss: {valid_loss:.4f}" if valid_loss is not None else "Validation encountered issues.")
             logger.info(f"Validation Metrics: {metrics}")
 
             eval_accuracy = metrics['eval_accuracy']

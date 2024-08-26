@@ -63,8 +63,10 @@ class DataPreparation:
                 for i, element in enumerate(walk):
                     if i % 2 == 0:  # Even index: Entity
                         encoded_walk.append(f"[ENTITY{i // 2 + 1}] {element} [/ENTITY{i // 2 + 1}]")
+                        encoded_walk.append("[SEP]")
                     else:  # Odd index: Relation
                         encoded_walk.append(f"[RELATION{i // 2 + 1}] {element} [/RELATION{i // 2 + 1}]")
+                        encoded_walk.append("[SEP]")
 
                 # Join the parts into a single string for BERT input
                 encoded_walks.append(' '.join(encoded_walk))
@@ -108,55 +110,74 @@ class DataPreparation:
 
         return walks, labels
 
-    def prepare_train_dataset(self, random_walk_strategy, alpha, num_walks, walk_length, size):
-        # Load the Codex train split
-        train_triples = self.codex.split("train")
+    def prepare_train_dataset(self, random_walk_strategy, alpha, num_walks, walk_length, size, mode="combined"):
+        """
+        Prepare the training dataset based on the specified mode.
 
-        # Assume equal proportions for valid and invalid walks for simplicity
-        total_size = len(train_triples)
-        if size == "full":
-            sample_size = total_size // 2
-        elif size == "half":
-            sample_size = total_size // 4  # Each category gets half of half (half the dataset, equally split)
+        Args:
+            random_walk_strategy: The strategy to use for random walks.
+            alpha: The alpha parameter for random walk generation.
+            num_walks: Number of walks to generate.
+            walk_length: Length of each walk.
+            size: Dataset size ('full' or 'half').
+            mode: Dataset preparation mode ('codex_only', 'random_walks_only', or 'combined').
+
+        Returns:
+            WalkDataset: The prepared dataset.
+        """
+        if mode == "codex_only" or mode == "combined":
+            # Load the Codex train split
+            train_triples = self.codex.split("train")
+
+            # Assume equal proportions for valid and invalid walks for simplicity
+            total_size = len(train_triples)
+            if size == "full":
+                sample_size = total_size // 2
+            elif size == "half":
+                sample_size = total_size // 4  # Each category gets half of half (half the dataset, equally split)
+            else:
+                raise ValueError("Unknown size specified. Supported sizes are 'full' and 'half'.")
+
+            # Sampling for valid walks
+            valid_triples_sampled = train_triples.sample(n=sample_size)
+            train_valid_walks = self.transform_triples(valid_triples_sampled)
+
+            # Corrupt equivalent amount for invalid walks, ensuring stratified sampling
+            remaining_triples = train_triples.drop(valid_triples_sampled.index)
+            invalid_triples_sampled = remaining_triples.sample(n=sample_size)
+            train_invalid_walks = self.generator.generate_invalid_random_walks(
+                self.transform_triples(invalid_triples_sampled))
+
+            logger.info("\nEncoded Train Walks:")
+            train_walks, train_labels = self.encode_data(train_valid_walks, train_invalid_walks)
         else:
-            raise ValueError("Unknown size specified. Supported sizes are 'full' and 'half'.")
+            train_walks, train_labels = [], []
 
-        # Sampling for valid walks
-        valid_triples_sampled = train_triples.sample(n=sample_size)
-        train_valid_walks = self.transform_triples(valid_triples_sampled)
+        if mode == "random_walks_only" or mode == "combined":
+            if random_walk_strategy:
+                # Generate additional random walks
+                valid_walks = self.generator.generate_random_walks(random_walk_strategy, alpha, num_walks, walk_length)
+                invalid_walks = self.generator.generate_invalid_random_walks(valid_walks)
 
-        # Corrupt equivalent amount for invalid walks, ensuring stratified sampling
-        remaining_triples = train_triples.drop(valid_triples_sampled.index)
-        invalid_triples_sampled = remaining_triples.sample(n=sample_size)
-        train_invalid_walks = self.generator.generate_invalid_random_walks(
-            self.transform_triples(invalid_triples_sampled))
+                logger.info("\nEncoded Train **Random** Walks:")
+                random_walks, labels = self.encode_data(valid_walks, invalid_walks)
 
-        logger.info("\nEncoded Train Walks:")
-        train_walks, train_labels = self.encode_data(train_valid_walks, train_invalid_walks)
-
-        if random_walk_strategy:
-            # Generate additional random walks if a strategy is provided
-            valid_walks = self.generator.generate_random_walks(random_walk_strategy, alpha, num_walks, walk_length)
-            invalid_walks = self.generator.generate_invalid_random_walks(valid_walks)
-
-            logger.info("\nEncoded Train **Random** Walks:")
-            random_walks, labels = self.encode_data(valid_walks, invalid_walks)
-
-            # Combine the walks and labels from the Codex split and random walks
-            combined_walks = random_walks + train_walks
-            combined_labels = labels + train_labels
-
-            dataset = WalkDataset(combined_walks, combined_labels, self.classifier.tokenizer)
-            logger.info(f"Creating WalkDataset with {len(combined_walks)} walks and {len(combined_labels)} labels.")
-            # Log the first item from the dataset
-            logger.info(f"First dataset item: {dataset[0]}")
-
+                # Combine the walks and labels from the Codex split and random walks if in combined mode
+                if mode == "combined":
+                    combined_walks = random_walks + train_walks
+                    combined_labels = labels + train_labels
+                else:
+                    combined_walks = random_walks
+                    combined_labels = labels
+            else:
+                raise ValueError("Random walk strategy must be provided for 'random_walks_only' or 'combined' mode.")
         else:
-            logger.info("No random walk strategy provided, using only Codex dataset.")
-            dataset = WalkDataset(train_walks, train_labels, self.classifier.tokenizer)
-            logger.info(f"Creating WalkDataset with {len(train_walks)} walks and {len(train_labels)} labels.")
-            # Log the first item from the dataset
-            logger.info(f"First dataset item: {dataset[0]}")
+            combined_walks, combined_labels = train_walks, train_labels
+
+        dataset = WalkDataset(combined_walks, combined_labels, self.classifier.tokenizer)
+        logger.info(f"Creating WalkDataset with {len(combined_walks)} walks and {len(combined_labels)} labels.")
+        # Log the first item from the dataset
+        logger.info(f"First dataset item: {dataset[0]}")
 
         return dataset
 
