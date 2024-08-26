@@ -108,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument('--encoding_format', type=str, default="bert",
                         help='Name of the encoding format (BERT or Tag)')
     parser.add_argument('--size', type=str, default="half", help='Train dataset size (full or half)')
-    parser.add_argument('--dataset_mode', type=str, default="half",
+    parser.add_argument('--dataset_mode', type=str, default="codex_only",
                         help='Dataset preparation mode (codex_only, random_walks_only, or combined)')
     parser.add_argument('--n_iterations', type=int, default=5,
                         help='Specify the number of iterations to perform during hyperparameter tuning. ')
