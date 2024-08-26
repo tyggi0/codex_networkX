@@ -110,7 +110,7 @@ class DataPreparation:
 
         return walks, labels
 
-    def prepare_train_dataset(self, random_walk_strategy, alpha, num_walks, walk_length, size, mode="combined"):
+    def prepare_train_dataset(self, random_walk_strategy, alpha, num_walks, walk_length, size, mode):
         """
         Prepare the training dataset based on the specified mode.
 
@@ -194,11 +194,12 @@ class DataPreparation:
         dataset = WalkDataset(walks, labels, self.classifier.tokenizer)
         return dataset
 
-    def prepare_datasets(self, random_walk_strategy, alpha, num_walks, walk_length, size):
+    def prepare_datasets(self, random_walk_strategy, alpha, num_walks, walk_length, size, dataset_mode):
         logger.info("Preparing datasets...")
 
         # Prepare training dataset from the graph
-        train_dataset = self.prepare_train_dataset(random_walk_strategy, alpha, num_walks, walk_length, size)
+        train_dataset = self.prepare_train_dataset(
+            random_walk_strategy, alpha, num_walks, walk_length, size, dataset_mode)
 
         # Prepare validation dataset from Codex splits
         valid_dataset = self.prepare_eval_dataset("valid")
