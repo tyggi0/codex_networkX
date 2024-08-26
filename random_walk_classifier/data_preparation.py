@@ -14,12 +14,16 @@ def create_textual_representation(codex, head, relation, tail, description, lowe
         cleaned = re.sub(r'\s*\(Property:[^)]*\)', '', text)
         return cleaned
 
-    head_label = f"{codex.entity_label(head)}: {clean_description(codex.entity_description(head))}" if description \
-        else f"{codex.entity_label(head)}"
-    relation_label = f"{codex.relation_label(relation)}: {clean_description(codex.relation_description(relation))}" \
-        if description else f"{codex.relation_label(relation)}"
-    tail_label = f"{codex.entity_label(tail)}: {clean_description(codex.entity_description(tail))}" \
-        if description else f"{codex.entity_label(tail)}"
+    if description:
+        # Use both labels and descriptions
+        head_label = f"{codex.entity_label(head)}: {clean_description(codex.entity_description(head))}"
+        relation_label = f"{codex.relation_label(relation)}: {clean_description(codex.relation_description(relation))}"
+        tail_label = f"{codex.entity_label(tail)}: {clean_description(codex.entity_description(tail))}"
+    else:
+        # Use only labels
+        head_label = f"{codex.entity_label(head)}"
+        relation_label = f"{codex.relation_label(relation)}"
+        tail_label = f"{codex.entity_label(tail)}"
 
     # Convert to lowercase if the option is enabled
     if lowercase:
