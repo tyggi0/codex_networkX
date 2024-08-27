@@ -100,8 +100,8 @@ if __name__ == "__main__":
                         help='Name of the random walk strategy (Traditional, ERGRW, Adapted_ERGRW), optional')
     parser.add_argument('--tune', action='store_true', help='Flag to tune hyperparameters')
     parser.add_argument('--alpha', type=float, default=0.5, help='Alpha parameter for the ERGRW random walk generator')
-    parser.add_argument('--num_walks', type=int, default=10000, help='Number of valid walks to generate')
-    parser.add_argument('--walk_length', type=int, default=40, help='Length of each walk')
+    parser.add_argument('--num_walks', type=int, default=8200, help='Number of valid walks to generate')
+    parser.add_argument('--walk_length', type=int, default=6, help='Length of each walk')
     parser.add_argument('--description', action='store_true',
                         help='Flag to include description for data textual representation')
     parser.add_argument('--lowercase', action='store_true', help='Flag to convert train data to lowercase')
