@@ -37,29 +37,34 @@ class ModelTrainer:
         self.early_stopping_patience = 3  # Define early stopping patience
 
     def compute_metrics(self, logits, labels):
-        if isinstance(logits, torch.Tensor):
-            logits = logits.detach().cpu().numpy()
-        if isinstance(labels, torch.Tensor):
-            labels = labels.detach().cpu().numpy()
+        # Ensure logits and labels are PyTorch tensors and on the CPU
+        if isinstance(logits, np.ndarray):
+            logits = torch.tensor(logits)
+        if isinstance(labels, np.ndarray):
+            labels = torch.tensor(labels)
+
+        logits = logits.cpu()
+        labels = labels.cpu()
 
         # Log logits and labels to debug NaN issue
         logger.info(f"Logits before softmax: {logits}")
         logger.info(f"Labels: {labels}")
 
-        # Compute predictions
-        predictions = np.argmax(logits, axis=-1)
-        logger.info(f"Predictions after argmax (axis=-1): {predictions}")
+        # Compute predictions using torch.argmax
+        predictions = torch.argmax(logits, dim=-1)
+        logger.info(f"Predictions after argmax (dim=-1): {predictions}")
 
-        # Compute probabilities: Add Small Epsilon to Logarithm
-        epsilon = 1e-10
-        softmax_output = torch.softmax(logits, dim=-1) + epsilon
-        probabilities = torch.log(softmax_output)
-        logger.info(f"Probabilities after softmax with epsilon (dim=-1): {probabilities}")
+        # Compute probabilities using softmax
+        probabilities = torch.softmax(logits, dim=-1)[:, 1]
+        logger.info(f"Probabilities after softmax (dim=-1): {probabilities}")
 
         # Ensure no NaN values in probabilities
-        probabilities = np.nan_to_num(probabilities, nan=0.0)
+        probabilities = torch.nan_to_num(probabilities, nan=0.0)
 
-        # predictions = (probabilities >= self.threshold).astype(int)
+        # Convert tensors to numpy arrays for sklearn metrics
+        labels = labels.numpy()
+        predictions = predictions.numpy()
+        probabilities = probabilities.numpy()
 
         eval_accuracy = accuracy_score(labels, predictions)
         roc_auc = roc_auc_score(labels, probabilities)
