@@ -160,7 +160,7 @@ class DataPreparation:
         if mode == "random_walks_only" or mode == "combined":
             if random_walk_strategy:
                 # Generate additional random walks
-                valid_walks = self.generator.generate_random_walks(random_walk_strategy, alpha, num_walks, walk_length)
+                valid_walks = self.generator.generate_random_walks(random_walk_strategy, alpha, num_walks, walk_length, mode)
                 invalid_walks = self.generator.generate_invalid_random_walks(valid_walks)
 
                 logger.info("\nEncoded Train **Random** Walks:")
