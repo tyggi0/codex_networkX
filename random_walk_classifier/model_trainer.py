@@ -153,7 +153,7 @@ class ModelTrainer:
 
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             logits = outputs.logits
-            logger.info(f"Training logits: {logits}")
+            # logger.info(f"Training logits: {logits}")
 
             if torch.isnan(logits).any():
                 logger.info("NaN detected in logits during training")
